@@ -2,30 +2,27 @@
 import { computed, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { CheckCircle2, Circle, Plus, Trash2 } from '@lucide/vue'
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-  DialogTrigger,
-} from 'reka-ui'
+import { DialogClose } from 'reka-ui'
 import Button from '@/components/ui/Button.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import FormDialog from '@/components/ui/FormDialog.vue'
 import Input from '@/components/ui/Input.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useConcursosStore } from '@/stores/concursos'
 import { useDisciplinasStore } from '@/stores/disciplinas'
 import { useFeedbackStore } from '@/stores/feedback'
 
 const store = useDisciplinasStore()
+const concursos = useConcursosStore()
 const feedback = useFeedbackStore()
 const { ordenadas, topicos } = storeToRefs(store)
+const { cargos, editais, perfis } = storeToRefs(concursos)
 const selecionada = ref(ordenadas.value[0]?.id ?? '')
 const open = ref(false)
+const topicOpen = ref(false)
 const nova = reactive({ nome: '', cor: '#047857' })
+const novoTopico = reactive({ titulo: '', perfilId: perfis.value[0]?.id ?? '', pesoProva: '1' })
 const topicosAtuais = computed(() =>
   topicos.value
     .filter((item) => item.disciplinaId === selecionada.value)
@@ -56,37 +53,55 @@ function excluirTopico(id: string) {
   store.excluirTopico(id)
   feedback.success('Tópico excluído.')
 }
+function nomePerfil(perfilId: string) {
+  const perfil = perfis.value.find((item) => item.id === perfilId)
+  const cargo = cargos.value.find((item) => item.id === perfil?.cargoId)
+  const edital = editais.value.find((item) => item.id === perfil?.editalId)
+  return `${cargo?.nome ?? 'Cargo'} · edital ${edital?.numero ?? 'sem número'}`
+}
+function adicionarTopico() {
+  store.adicionarTopico({
+    disciplinaId: selecionada.value,
+    perfilId: novoTopico.perfilId,
+    titulo: novoTopico.titulo,
+    pesoProva: Number(novoTopico.pesoProva),
+    questoesCertas: 0,
+    questoesErradas: 0,
+    concluido: false,
+    ordem: topicosAtuais.value.length + 1,
+  })
+  const titulo = novoTopico.titulo
+  Object.assign(novoTopico, { titulo: '', pesoProva: '1' })
+  topicOpen.value = false
+  feedback.success(`${titulo} foi adicionado.`)
+}
 </script>
 <template>
   <section>
     <PageHeader
       title="Disciplinas e tópicos"
       description="Organize o conteúdo cobrado e acompanhe o avanço em cada matéria."
-      ><DialogRoot v-model:open="open"
-        ><DialogTrigger as-child
-          ><Button><Plus class="size-4" />Nova disciplina</Button></DialogTrigger
-        ><DialogPortal
-          ><DialogOverlay class="fixed inset-0 z-40 bg-slate-950/40" /><DialogContent
-            class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl"
-            ><DialogTitle class="text-xl font-bold">Nova disciplina</DialogTitle
-            ><DialogDescription class="mt-1 text-sm text-slate-500"
-              >Inclua uma matéria na sua organização.</DialogDescription
-            >
-            <form class="mt-6 space-y-4" @submit.prevent="adicionar">
-              <label class="block space-y-1.5"
-                ><span class="text-sm font-semibold">Nome</span
-                ><Input v-model="nova.nome" required /></label
-              ><label class="block space-y-1.5"
-                ><span class="text-sm font-semibold">Cor</span
-                ><Input v-model="nova.cor" type="color" class="p-1"
-              /></label>
-              <div class="flex justify-end gap-3">
-                <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
-                ><Button type="submit">Adicionar</Button>
-              </div>
-            </form></DialogContent
-          ></DialogPortal
-        ></DialogRoot
+      ><FormDialog
+        v-model="open"
+        title="Nova disciplina"
+        description="Inclua uma matéria na sua organização."
+      >
+        <template #trigger
+          ><Button><Plus class="size-4" />Nova disciplina</Button></template
+        >
+        <form class="mt-6 space-y-4" @submit.prevent="adicionar">
+          <label class="block space-y-1.5"
+            ><span class="text-sm font-semibold">Nome</span
+            ><Input v-model="nova.nome" required /></label
+          ><label class="block space-y-1.5"
+            ><span class="text-sm font-semibold">Cor</span
+            ><Input v-model="nova.cor" type="color" class="p-1"
+          /></label>
+          <div class="flex justify-end gap-3">
+            <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
+            ><Button type="submit">Adicionar</Button>
+          </div>
+        </form></FormDialog
       ></PageHeader
     ><EmptyState
       v-if="!ordenadas.length"
@@ -120,14 +135,53 @@ function excluirTopico(id: string) {
             <h2 class="font-bold">{{ ordenadas.find((item) => item.id === selecionada)?.nome }}</h2>
             <p class="mt-1 text-sm text-slate-500">{{ progresso }}% concluído</p>
           </div>
-          <ConfirmDialog
-            title="Excluir disciplina?"
-            description="Todos os tópicos desta disciplina também serão excluídos."
-            @confirm="excluirDisciplina(selecionada)"
-            ><Button variant="ghost" size="sm"
-              ><Trash2 class="size-4 text-red-600" />Excluir</Button
-            ></ConfirmDialog
-          >
+          <div class="flex items-center gap-2">
+            <FormDialog
+              v-model="topicOpen"
+              title="Novo tópico"
+              description="Vincule o conteúdo a um perfil de edital e cargo."
+            >
+              <template #trigger
+                ><Button size="sm" :disabled="!perfis.length"
+                  ><Plus class="size-4" />Novo tópico</Button
+                ></template
+              >
+              <form class="mt-6 space-y-4" @submit.prevent="adicionarTopico">
+                <label class="block space-y-1.5"
+                  ><span class="text-sm font-semibold">Título</span
+                  ><Input v-model="novoTopico.titulo" required
+                /></label>
+                <label class="block space-y-1.5"
+                  ><span class="text-sm font-semibold">Perfil</span
+                  ><select
+                    v-model="novoTopico.perfilId"
+                    required
+                    class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+                  >
+                    <option v-for="perfil in perfis" :key="perfil.id" :value="perfil.id">
+                      {{ nomePerfil(perfil.id) }}
+                    </option>
+                  </select></label
+                >
+                <label class="block space-y-1.5"
+                  ><span class="text-sm font-semibold">Peso na prova</span
+                  ><Input v-model="novoTopico.pesoProva" type="number" min="1" required
+                /></label>
+                <div class="flex justify-end gap-3">
+                  <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
+                  ><Button type="submit">Adicionar tópico</Button>
+                </div>
+              </form>
+            </FormDialog>
+            <ConfirmDialog
+              title="Excluir disciplina?"
+              description="Todos os tópicos desta disciplina também serão excluídos."
+              @confirm="excluirDisciplina(selecionada)"
+              ><Button variant="ghost" size="sm"
+                ><Trash2 class="size-4 text-red-600" />Excluir</Button
+              ></ConfirmDialog
+            >
+          </div>
         </header>
         <div v-if="topicosAtuais.length" class="divide-y">
           <article

@@ -34,12 +34,25 @@ describe('organização de concursos', () => {
     ).toThrow('já possui um edital')
   })
 
-  it('remove vínculos ao excluir um concurso', () => {
+  it('inclui, edita e exclui um perfil válido', () => {
     const store = useConcursosStore()
-    const edital = store.editais.find((item) => item.orgaoId === 'trt7')
-    store.excluirOrgao('trt7')
-    expect(store.orgaos.some((item) => item.id === 'trt7')).toBe(false)
-    expect(store.editais.some((item) => item.orgaoId === 'trt7')).toBe(false)
-    expect(store.perfis.some((item) => item.editalId === edital?.id)).toBe(false)
+    const dados = {
+      editalId: 'edital-1',
+      cargoId: 'analista',
+      remuneracao: 9_000,
+      vagasAmpla: 2,
+      vagasCadastroReserva: 4,
+      cargaHoraria: 40,
+      municipioLotacao: 'Fortaleza',
+      ufLotacao: 'CE',
+    }
+
+    const perfil = store.adicionarPerfil(dados)
+    expect(store.perfis).toContainEqual(perfil)
+    expect(store.editarPerfil(perfil.id, { ...dados, remuneracao: 10_000 })).toBe(true)
+    expect(store.perfis.find((item) => item.id === perfil.id)?.remuneracao).toBe(10_000)
+
+    store.excluirPerfil(perfil.id)
+    expect(store.perfis.some((item) => item.id === perfil.id)).toBe(false)
   })
 })

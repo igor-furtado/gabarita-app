@@ -2,19 +2,11 @@
 import { computed, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { CalendarPlus, Trash2 } from '@lucide/vue'
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-  DialogTrigger,
-} from 'reka-ui'
+import { DialogClose } from 'reka-ui'
 import Button from '@/components/ui/Button.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import FormDialog from '@/components/ui/FormDialog.vue'
 import Input from '@/components/ui/Input.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { formatarData } from '@/lib/utils'
@@ -76,49 +68,45 @@ function excluirEvento(id: string) {
     <PageHeader
       title="Calendário"
       description="Visualize as datas relevantes dos editais em uma linha do tempo simples."
-      ><DialogRoot v-model:open="open"
-        ><DialogTrigger as-child
+      ><FormDialog
+        v-model="open"
+        title="Novo evento"
+        description="Toda data deve estar vinculada a um edital."
+      >
+        <template #trigger
           ><Button :disabled="!editais.length"
             ><CalendarPlus class="size-4" />Novo evento</Button
-          ></DialogTrigger
-        ><DialogPortal
-          ><DialogOverlay class="fixed inset-0 z-40 bg-slate-950/40" /><DialogContent
-            class="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl"
-            ><DialogTitle class="text-xl font-bold">Novo evento</DialogTitle
-            ><DialogDescription class="mt-1 text-sm text-slate-500"
-              >Toda data deve estar vinculada a um edital.</DialogDescription
+          ></template
+        >
+        <form class="mt-6 space-y-4" @submit.prevent="adicionar">
+          <label class="block space-y-1.5"
+            ><span class="text-sm font-semibold">Edital</span
+            ><select
+              v-model="form.editalId"
+              required
+              class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
             >
-            <form class="mt-6 space-y-4" @submit.prevent="adicionar">
-              <label class="block space-y-1.5"
-                ><span class="text-sm font-semibold">Edital</span
-                ><select
-                  v-model="form.editalId"
-                  required
-                  class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-                >
-                  <option v-for="edital in editais" :key="edital.id" :value="edital.id">
-                    {{ nomeEdital(edital.id) }}
-                  </option>
-                </select></label
-              ><label class="block space-y-1.5"
-                ><span class="text-sm font-semibold">Tipo</span
-                ><select
-                  v-model="form.tipo"
-                  class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-                >
-                  <option v-for="tipo in tipos" :key="tipo">{{ tipo }}</option>
-                </select></label
-              ><label class="block space-y-1.5"
-                ><span class="text-sm font-semibold">Data</span
-                ><Input v-model="form.data" type="date" required
-              /></label>
-              <div class="flex justify-end gap-3">
-                <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
-                ><Button type="submit">Adicionar</Button>
-              </div>
-            </form></DialogContent
-          ></DialogPortal
-        ></DialogRoot
+              <option v-for="edital in editais" :key="edital.id" :value="edital.id">
+                {{ nomeEdital(edital.id) }}
+              </option>
+            </select></label
+          ><label class="block space-y-1.5"
+            ><span class="text-sm font-semibold">Tipo</span
+            ><select
+              v-model="form.tipo"
+              class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+            >
+              <option v-for="tipo in tipos" :key="tipo">{{ tipo }}</option>
+            </select></label
+          ><label class="block space-y-1.5"
+            ><span class="text-sm font-semibold">Data</span
+            ><Input v-model="form.data" type="date" required
+          /></label>
+          <div class="flex justify-end gap-3">
+            <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
+            ><Button type="submit">Adicionar</Button>
+          </div>
+        </form></FormDialog
       ></PageHeader
     ><EmptyState
       v-if="!ordenados.length"

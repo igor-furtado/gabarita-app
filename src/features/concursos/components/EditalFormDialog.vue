@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-  DialogTrigger,
-} from 'reka-ui'
+import { DialogClose } from 'reka-ui'
 import { FilePlus2 } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
+import FormDialog from '@/components/ui/FormDialog.vue'
 import Input from '@/components/ui/Input.vue'
 import type { NovoEdital, SituacaoEdital } from '@/types/domain'
 
@@ -44,53 +36,50 @@ function submit() {
 }
 </script>
 <template>
-  <DialogRoot v-model:open="open"
-    ><DialogTrigger as-child
-      ><Button><FilePlus2 class="size-4" />Adicionar edital</Button></DialogTrigger
-    ><DialogPortal
-      ><DialogOverlay class="fixed inset-0 z-40 bg-slate-950/40" /><DialogContent
-        class="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        ><DialogTitle class="text-xl font-bold">Adicionar edital</DialogTitle
-        ><DialogDescription class="mt-1 text-sm text-slate-500"
-          >Registre o último edital publicado por este órgão.</DialogDescription
-        >
-        <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
-          <label class="space-y-1.5 sm:col-span-2"
-            ><span class="text-sm font-semibold">Título</span
-            ><Input v-model="form.titulo" required /></label
-          ><label class="space-y-1.5"
-            ><span class="text-sm font-semibold">Número</span
-            ><Input v-model="form.numero" required placeholder="01/2026" /></label
-          ><label class="space-y-1.5"
-            ><span class="text-sm font-semibold">Banca</span
-            ><Input v-model="form.banca" required /></label
-          ><label class="space-y-1.5"
-            ><span class="text-sm font-semibold">Situação</span
-            ><select
-              v-model="form.situacao"
-              class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-            >
-              <option v-for="item in situacoes" :key="item">{{ item }}</option>
-            </select></label
-          ><label class="space-y-1.5"
-            ><span class="text-sm font-semibold">Publicação</span
-            ><Input v-model="form.dataPublicacao" type="date" required /></label
-          ><label class="space-y-1.5 sm:col-span-2"
-            ><span class="text-sm font-semibold">URL do documento</span
-            ><Input v-model="form.urlDocumento" type="url" required /></label
-          ><label class="space-y-1.5 sm:col-span-2"
-            ><span class="text-sm font-semibold">Observações</span
-            ><textarea
-              v-model="form.observacoes"
-              class="min-h-24 w-full rounded-lg border p-3 text-sm"
-            />
-          </label>
-          <div class="mt-2 flex justify-end gap-3 sm:col-span-2">
-            <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
-            ><Button type="submit">Salvar edital</Button>
-          </div>
-        </form></DialogContent
-      ></DialogPortal
-    ></DialogRoot
+  <FormDialog
+    v-model="open"
+    title="Adicionar edital"
+    description="Registre o último edital publicado por este órgão."
+    content-class="max-w-2xl"
   >
+    <template #trigger
+      ><Button><FilePlus2 class="size-4" />Adicionar edital</Button></template
+    >
+    <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
+      <label class="space-y-1.5 sm:col-span-2"
+        ><span class="text-sm font-semibold">Título</span
+        ><Input v-model="form.titulo" required /></label
+      ><label class="space-y-1.5"
+        ><span class="text-sm font-semibold">Número</span
+        ><Input v-model="form.numero" required placeholder="01/2026" /></label
+      ><label class="space-y-1.5"
+        ><span class="text-sm font-semibold">Banca</span
+        ><Input v-model="form.banca" required /></label
+      ><label class="space-y-1.5"
+        ><span class="text-sm font-semibold">Situação</span
+        ><select
+          v-model="form.situacao"
+          class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+        >
+          <option v-for="item in situacoes" :key="item">{{ item }}</option>
+        </select></label
+      ><label class="space-y-1.5"
+        ><span class="text-sm font-semibold">Publicação</span
+        ><Input v-model="form.dataPublicacao" type="date" required /></label
+      ><label class="space-y-1.5 sm:col-span-2"
+        ><span class="text-sm font-semibold">URL do documento</span
+        ><Input v-model="form.urlDocumento" type="url" required /></label
+      ><label class="space-y-1.5 sm:col-span-2"
+        ><span class="text-sm font-semibold">Observações</span
+        ><textarea
+          v-model="form.observacoes"
+          class="min-h-24 w-full rounded-lg border p-3 text-sm"
+        />
+      </label>
+      <div class="mt-2 flex justify-end gap-3 sm:col-span-2">
+        <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
+        ><Button type="submit">Salvar edital</Button>
+      </div>
+    </form>
+  </FormDialog>
 </template>

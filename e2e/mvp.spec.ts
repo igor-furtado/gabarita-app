@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test'
 test('fluxo principal do MVP funciona sem erros visíveis', async ({ page }) => {
   const erros: string[] = []
   page.on('pageerror', (error) => erros.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') erros.push(message.text())
+  })
   await page.goto('/')
   await expect(page).toHaveURL(/\/concursos$/)
   await expect(page.getByRole('heading', { name: 'Concursos' })).toBeVisible()
@@ -30,5 +33,6 @@ test('fluxo principal do MVP funciona sem erros visíveis', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Disciplinas e tópicos' })).toBeVisible()
   await page.getByRole('link', { name: 'Calendário' }).first().click()
   await expect(page.getByRole('heading', { name: 'Calendário' })).toBeVisible()
+  await expect(page.getByText(/erro inesperado|não foi possível/i)).toHaveCount(0)
   expect(erros).toEqual([])
 })

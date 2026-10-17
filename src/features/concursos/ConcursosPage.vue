@@ -18,7 +18,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import OrgaoFormDialog from './components/OrgaoFormDialog.vue'
 import { useConcursosStore } from '@/stores/concursos'
 import { useFeedbackStore } from '@/stores/feedback'
-import type { Edital, Orgao } from '@/types/domain'
+import type { Edital, Orgao, SituacaoEdital } from '@/types/domain'
 
 interface ConcursoLinha {
   orgao: Orgao
@@ -66,12 +66,20 @@ const table = useVueTable({
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
 })
-function tone(situacao?: string) {
-  return situacao === 'inscrições abertas' || situacao === 'vigente'
-    ? 'green'
-    : situacao === 'anulado' || situacao === 'encerrado'
-      ? 'red'
-      : 'amber'
+const toneBySituacao: Record<SituacaoEdital, 'green' | 'amber' | 'red'> = {
+  previsto: 'amber',
+  autorizado: 'amber',
+  'comissão formada': 'amber',
+  'banca definida': 'amber',
+  'inscrições abertas': 'green',
+  'em andamento': 'amber',
+  vigente: 'green',
+  prorrogado: 'amber',
+  anulado: 'red',
+  encerrado: 'red',
+}
+function tone(situacao?: SituacaoEdital) {
+  return situacao ? toneBySituacao[situacao] : 'neutral'
 }
 function criarConcurso(dados: Parameters<typeof store.criarOrgao>[0]) {
   const orgao = store.criarOrgao(dados)

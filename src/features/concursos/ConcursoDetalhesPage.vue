@@ -9,15 +9,15 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import EditalFormDialog from './components/EditalFormDialog.vue'
 import { formatarData, formatarMoeda } from '@/lib/utils'
-import { useCalendarioStore } from '@/stores/calendario'
 import { useConcursosStore } from '@/stores/concursos'
 import { useFeedbackStore } from '@/stores/feedback'
+import { useOrganizacaoStore } from '@/stores/organizacao'
 
 const route = useRoute()
 const router = useRouter()
 const store = useConcursosStore()
-const calendario = useCalendarioStore()
 const feedback = useFeedbackStore()
+const organizacao = useOrganizacaoStore()
 const { orgaos, editais, perfis, cargos } = storeToRefs(store)
 const id = computed(() => String(route.params.id))
 const orgao = computed(() => orgaos.value.find((item) => item.id === id.value))
@@ -27,15 +27,13 @@ const perfisDoEdital = computed(() =>
 )
 function excluirConcurso() {
   const sigla = orgao.value?.sigla ?? 'Concurso'
-  if (edital.value) calendario.excluirEventosDoEdital(edital.value.id)
-  store.excluirOrgao(id.value)
+  organizacao.excluirConcurso(id.value)
   feedback.success(`${sigla} foi excluído.`)
   void router.push('/concursos')
 }
 function excluirEdital() {
   if (edital.value) {
-    calendario.excluirEventosDoEdital(edital.value.id)
-    store.excluirEdital(edital.value.id)
+    organizacao.excluirEdital(edital.value.id)
     feedback.success('Edital excluído.')
   }
 }

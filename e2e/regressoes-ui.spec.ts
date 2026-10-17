@@ -3,19 +3,17 @@ import { expect, test } from '@playwright/test'
 test('mantém a navegação lateral fixa durante o scroll', async ({ page }) => {
   await page.goto('/concursos')
   const sidebar = page.locator('aside')
-  const painel = page.locator('aside + div')
+  const painel = page.getByRole('region', { name: 'Conteúdo principal' })
   const antes = await sidebar.boundingBox()
 
   await page.mouse.move(1_000, 500)
   await page.mouse.wheel(0, 2_000)
-  await page.waitForTimeout(100)
+  await expect.poll(() => painel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
   const depois = await sidebar.boundingBox()
 
   expect(antes?.y).toBe(0)
   expect(depois?.y).toBe(0)
   expect(await page.evaluate<number>('window.scrollY')).toBe(0)
-  expect(await painel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
-
   await page.mouse.wheel(0, -4_000)
   expect(await page.evaluate<number>('window.scrollY')).toBe(0)
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
@@ -64,6 +62,14 @@ test('mostra feedback ao adicionar e excluir uma disciplina', async ({ page }) =
   await expect(page.getByRole('alert')).toContainText('Ética no serviço público foi adicionada')
   await page.getByRole('button', { name: 'Fechar alerta' }).click()
   await page.getByRole('button', { name: /Ética no serviço público/ }).click()
+  await page.getByRole('button', { name: 'Novo tópico' }).click()
+  await page.getByLabel('Título').fill('Princípios da administração pública')
+  await page.getByRole('button', { name: 'Adicionar tópico' }).click()
+  await expect(page.getByRole('alert')).toContainText(
+    'Princípios da administração pública foi adicionado',
+  )
+  await expect(page.getByText('Princípios da administração pública', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Fechar alerta' }).click()
   await page.getByRole('button', { name: 'Excluir', exact: true }).click()
   await page.getByRole('button', { name: 'Excluir', exact: true }).click()
 

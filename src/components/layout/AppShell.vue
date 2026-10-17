@@ -50,7 +50,12 @@ const links = [
         Organize seus estudos<br />para passar.
       </p>
     </aside>
-    <div ref="scrollPanel" class="h-dvh min-w-0 overflow-y-auto overscroll-y-none">
+    <div
+      ref="scrollPanel"
+      class="h-dvh min-w-0 overflow-y-auto overscroll-y-none"
+      role="region"
+      aria-label="Conteúdo principal"
+    >
       <header class="sticky top-0 z-30 border-b bg-white/95 backdrop-blur md:hidden">
         <div class="flex h-14 items-center justify-between px-4">
           <RouterLink to="/concursos" class="flex items-center gap-2 font-black"

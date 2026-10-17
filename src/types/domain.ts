@@ -80,3 +80,5 @@ export interface EventoCalendario {
 
 export type NovoOrgao = Omit<Orgao, 'id'>
 export type NovoEdital = Omit<Edital, 'id' | 'orgaoId'>
+export type NovoCargo = Omit<Cargo, 'id'>
+export type NovoPerfil = Omit<Perfil, 'id'>

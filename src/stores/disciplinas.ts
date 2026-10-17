@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { disciplinasIniciais, topicosIniciais } from '@/mocks/data'
+import { useConcursosStore } from '@/stores/concursos'
 import type { Disciplina, Topico } from '@/types/domain'
 
 export const useDisciplinasStore = defineStore('disciplinas', () => {
@@ -22,14 +23,23 @@ export const useDisciplinasStore = defineStore('disciplinas', () => {
   function adicionarTopico(dados: Omit<Topico, 'id'>) {
     if (!disciplinas.value.some((item) => item.id === dados.disciplinaId))
       throw new Error('Disciplina não encontrada.')
+    if (!useConcursosStore().perfis.some((item) => item.id === dados.perfilId))
+      throw new Error('Perfil não encontrado.')
     topicos.value.push({ ...dados, id: crypto.randomUUID() })
   }
   function editarTopico(id: string, dados: Omit<Topico, 'id'>) {
+    if (!disciplinas.value.some((item) => item.id === dados.disciplinaId))
+      throw new Error('Disciplina não encontrada.')
+    if (!useConcursosStore().perfis.some((item) => item.id === dados.perfilId))
+      throw new Error('Perfil não encontrado.')
     const indice = topicos.value.findIndex((item) => item.id === id)
     if (indice >= 0) topicos.value[indice] = { ...dados, id }
   }
   function excluirTopico(id: string) {
     topicos.value = topicos.value.filter((item) => item.id !== id)
+  }
+  function excluirTopicosDosPerfis(perfilIds: string[]) {
+    topicos.value = topicos.value.filter((item) => !perfilIds.includes(item.perfilId))
   }
   function alternarConclusao(id: string) {
     const topico = topicos.value.find((item) => item.id === id)
@@ -45,6 +55,7 @@ export const useDisciplinasStore = defineStore('disciplinas', () => {
     adicionarTopico,
     editarTopico,
     excluirTopico,
+    excluirTopicosDosPerfis,
     alternarConclusao,
   }
 })

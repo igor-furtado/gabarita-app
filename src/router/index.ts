@@ -13,5 +13,4 @@ export const router = createRouter({
     { path: '/disciplinas', component: DisciplinasPage },
     { path: '/calendario', component: CalendarioPage },
   ],
-  scrollBehavior: () => ({ top: 0 }),
 })
