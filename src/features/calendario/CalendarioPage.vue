@@ -2,7 +2,6 @@
 import { computed, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { CalendarPlus, Trash2 } from '@lucide/vue'
-import { DialogClose } from 'reka-ui'
 import Button from '@/components/ui/Button.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -72,42 +71,35 @@ function excluirEvento(id: string) {
         v-model="open"
         title="Novo evento"
         description="Toda data deve estar vinculada a um edital."
+        submit-label="Adicionar"
+        form-class="space-y-4"
+        @submit="adicionar"
       >
         <template #trigger
           ><Button :disabled="!editais.length"
             ><CalendarPlus class="size-4" />Novo evento</Button
           ></template
         >
-        <form class="mt-6 space-y-4" @submit.prevent="adicionar">
-          <label class="block space-y-1.5"
-            ><span class="text-sm font-semibold">Edital</span
-            ><select
-              v-model="form.editalId"
-              required
-              class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-            >
-              <option v-for="edital in editais" :key="edital.id" :value="edital.id">
-                {{ nomeEdital(edital.id) }}
-              </option>
-            </select></label
-          ><label class="block space-y-1.5"
-            ><span class="text-sm font-semibold">Tipo</span
-            ><select
-              v-model="form.tipo"
-              class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
-            >
-              <option v-for="tipo in tipos" :key="tipo">{{ tipo }}</option>
-            </select></label
-          ><label class="block space-y-1.5"
-            ><span class="text-sm font-semibold">Data</span
-            ><Input v-model="form.data" type="date" required
-          /></label>
-          <div class="flex justify-end gap-3">
-            <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose
-            ><Button type="submit">Adicionar</Button>
-          </div>
-        </form></FormDialog
-      ></PageHeader
+        <label class="block space-y-1.5"
+          ><span class="text-sm font-semibold">Edital</span
+          ><select
+            v-model="form.editalId"
+            required
+            class="h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          >
+            <option v-for="edital in editais" :key="edital.id" :value="edital.id">
+              {{ nomeEdital(edital.id) }}
+            </option>
+          </select></label
+        ><label class="block space-y-1.5"
+          ><span class="text-sm font-semibold">Tipo</span
+          ><select v-model="form.tipo" class="h-10 w-full rounded-lg border bg-white px-3 text-sm">
+            <option v-for="tipo in tipos" :key="tipo">{{ tipo }}</option>
+          </select></label
+        ><label class="block space-y-1.5"
+          ><span class="text-sm font-semibold">Data</span
+          ><Input v-model="form.data" type="date" required
+        /></label> </FormDialog></PageHeader
     ><EmptyState
       v-if="!ordenados.length"
       title="Nenhuma data registrada"

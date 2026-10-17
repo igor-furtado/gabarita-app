@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   DialogContent,
+  DialogClose,
   DialogDescription,
   DialogOverlay,
   DialogPortal,
@@ -8,12 +9,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from 'reka-ui'
+import Button from '@/components/ui/Button.vue'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
-  defineProps<{ title: string; description: string; contentClass?: string }>(),
-  { contentClass: '' },
+  defineProps<{
+    title: string
+    description: string
+    submitLabel: string
+    contentClass?: string
+    formClass?: string
+    actionsClass?: string
+  }>(),
+  { contentClass: '', formClass: '', actionsClass: '' },
 )
+const emit = defineEmits<{ submit: [] }>()
 const open = defineModel<boolean>({ default: false })
 </script>
 
@@ -32,7 +42,13 @@ const open = defineModel<boolean>({ default: false })
       >
         <DialogTitle class="text-xl font-bold">{{ title }}</DialogTitle>
         <DialogDescription class="mt-1 text-sm text-slate-500">{{ description }}</DialogDescription>
-        <slot />
+        <form :class="cn('mt-6', props.formClass)" @submit.prevent="emit('submit')">
+          <slot />
+          <div :class="cn('mt-2 flex justify-end gap-3', props.actionsClass)">
+            <DialogClose as-child><Button variant="secondary">Cancelar</Button></DialogClose>
+            <Button type="submit">{{ submitLabel }}</Button>
+          </div>
+        </form>
       </DialogContent>
     </DialogPortal>
   </DialogRoot>

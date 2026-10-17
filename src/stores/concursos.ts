@@ -29,13 +29,6 @@ export const useConcursosStore = defineStore('concursos', () => {
     return true
   }
 
-  function excluirOrgao(id: string) {
-    const editalIds = editais.value.filter((item) => item.orgaoId === id).map((item) => item.id)
-    perfis.value = perfis.value.filter((item) => !editalIds.includes(item.editalId))
-    editais.value = editais.value.filter((item) => item.orgaoId !== id)
-    orgaos.value = orgaos.value.filter((item) => item.id !== id)
-  }
-
   function adicionarEdital(orgaoId: string, dados: NovoEdital) {
     if (!orgaos.value.some((item) => item.id === orgaoId)) throw new Error('Órgão não encontrado.')
     if (editais.value.some((item) => item.orgaoId === orgaoId))
@@ -53,11 +46,6 @@ export const useConcursosStore = defineStore('concursos', () => {
     return true
   }
 
-  function excluirEdital(id: string) {
-    perfis.value = perfis.value.filter((item) => item.editalId !== id)
-    editais.value = editais.value.filter((item) => item.id !== id)
-  }
-
   function adicionarCargo(dados: NovoCargo) {
     const cargo = { ...dados, id: crypto.randomUUID() }
     cargos.value.push(cargo)
@@ -71,34 +59,26 @@ export const useConcursosStore = defineStore('concursos', () => {
     return true
   }
 
-  function excluirCargo(id: string) {
-    perfis.value = perfis.value.filter((item) => item.cargoId !== id)
-    cargos.value = cargos.value.filter((item) => item.id !== id)
-  }
-
-  function adicionarPerfil(dados: NovoPerfil) {
+  function validarRelacoesDoPerfil(dados: NovoPerfil) {
     if (!editais.value.some((item) => item.id === dados.editalId))
       throw new Error('Edital não encontrado.')
     if (!cargos.value.some((item) => item.id === dados.cargoId))
       throw new Error('Cargo não encontrado.')
+  }
+
+  function adicionarPerfil(dados: NovoPerfil) {
+    validarRelacoesDoPerfil(dados)
     const perfil = { ...dados, id: crypto.randomUUID() }
     perfis.value.push(perfil)
     return perfil
   }
 
   function editarPerfil(id: string, dados: NovoPerfil) {
-    if (!editais.value.some((item) => item.id === dados.editalId))
-      throw new Error('Edital não encontrado.')
-    if (!cargos.value.some((item) => item.id === dados.cargoId))
-      throw new Error('Cargo não encontrado.')
+    validarRelacoesDoPerfil(dados)
     const indice = perfis.value.findIndex((item) => item.id === id)
     if (indice < 0) return false
     perfis.value[indice] = { ...dados, id }
     return true
-  }
-
-  function excluirPerfil(id: string) {
-    perfis.value = perfis.value.filter((item) => item.id !== id)
   }
 
   return {
@@ -109,15 +89,11 @@ export const useConcursosStore = defineStore('concursos', () => {
     concursos,
     criarOrgao,
     editarOrgao,
-    excluirOrgao,
     adicionarEdital,
     editarEdital,
-    excluirEdital,
     adicionarCargo,
     editarCargo,
-    excluirCargo,
     adicionarPerfil,
     editarPerfil,
-    excluirPerfil,
   }
 })

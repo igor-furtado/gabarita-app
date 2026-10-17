@@ -33,6 +33,6 @@ test('fluxo principal do MVP funciona sem erros visíveis', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Disciplinas e tópicos' })).toBeVisible()
   await page.getByRole('link', { name: 'Calendário' }).first().click()
   await expect(page.getByRole('heading', { name: 'Calendário' })).toBeVisible()
-  await expect(page.getByText(/erro inesperado|não foi possível/i)).toHaveCount(0)
+  await expect(page.locator('[role="alert"][data-variant="error"]')).toHaveCount(0)
   expect(erros).toEqual([])
 })

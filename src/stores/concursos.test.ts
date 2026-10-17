@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useConcursosStore } from './concursos'
+import { useOrganizacaoStore } from './organizacao'
 
 describe('organização de concursos', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -36,6 +37,7 @@ describe('organização de concursos', () => {
 
   it('inclui, edita e exclui um perfil válido', () => {
     const store = useConcursosStore()
+    const organizacao = useOrganizacaoStore()
     const dados = {
       editalId: 'edital-1',
       cargoId: 'analista',
@@ -52,7 +54,7 @@ describe('organização de concursos', () => {
     expect(store.editarPerfil(perfil.id, { ...dados, remuneracao: 10_000 })).toBe(true)
     expect(store.perfis.find((item) => item.id === perfil.id)?.remuneracao).toBe(10_000)
 
-    store.excluirPerfil(perfil.id)
+    organizacao.excluirPerfil(perfil.id)
     expect(store.perfis.some((item) => item.id === perfil.id)).toBe(false)
   })
 })

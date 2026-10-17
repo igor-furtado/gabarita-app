@@ -15,8 +15,8 @@ export const useOrganizacaoStore = defineStore('organizacao', () => {
 
     disciplinas.excluirTopicosDosPerfis(perfilIds)
     calendario.excluirEventosDoEdital(editalId)
-    for (const perfilId of perfilIds) concursos.excluirPerfil(perfilId)
-    concursos.excluirEdital(editalId)
+    concursos.perfis = concursos.perfis.filter((perfil) => !perfilIds.includes(perfil.id))
+    concursos.editais = concursos.editais.filter((edital) => edital.id !== editalId)
   }
 
   function excluirConcurso(orgaoId: string) {
@@ -25,7 +25,7 @@ export const useOrganizacaoStore = defineStore('organizacao', () => {
       .map((edital) => edital.id)
 
     for (const editalId of editalIds) excluirEdital(editalId)
-    concursos.excluirOrgao(orgaoId)
+    concursos.orgaos = concursos.orgaos.filter((orgao) => orgao.id !== orgaoId)
   }
 
   function excluirCargo(cargoId: string) {
@@ -34,13 +34,13 @@ export const useOrganizacaoStore = defineStore('organizacao', () => {
       .map((perfil) => perfil.id)
 
     disciplinas.excluirTopicosDosPerfis(perfilIds)
-    for (const perfilId of perfilIds) concursos.excluirPerfil(perfilId)
-    concursos.excluirCargo(cargoId)
+    concursos.perfis = concursos.perfis.filter((perfil) => !perfilIds.includes(perfil.id))
+    concursos.cargos = concursos.cargos.filter((cargo) => cargo.id !== cargoId)
   }
 
   function excluirPerfil(perfilId: string) {
     disciplinas.excluirTopicosDosPerfis([perfilId])
-    concursos.excluirPerfil(perfilId)
+    concursos.perfis = concursos.perfis.filter((perfil) => perfil.id !== perfilId)
   }
 
   return { excluirCargo, excluirConcurso, excluirEdital, excluirPerfil }

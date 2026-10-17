@@ -20,18 +20,18 @@ export const useDisciplinasStore = defineStore('disciplinas', () => {
     topicos.value = topicos.value.filter((item) => item.disciplinaId !== id)
     disciplinas.value = disciplinas.value.filter((item) => item.id !== id)
   }
-  function adicionarTopico(dados: Omit<Topico, 'id'>) {
+  function validarRelacoesDoTopico(dados: Omit<Topico, 'id'>) {
     if (!disciplinas.value.some((item) => item.id === dados.disciplinaId))
       throw new Error('Disciplina não encontrada.')
     if (!useConcursosStore().perfis.some((item) => item.id === dados.perfilId))
       throw new Error('Perfil não encontrado.')
+  }
+  function adicionarTopico(dados: Omit<Topico, 'id'>) {
+    validarRelacoesDoTopico(dados)
     topicos.value.push({ ...dados, id: crypto.randomUUID() })
   }
   function editarTopico(id: string, dados: Omit<Topico, 'id'>) {
-    if (!disciplinas.value.some((item) => item.id === dados.disciplinaId))
-      throw new Error('Disciplina não encontrada.')
-    if (!useConcursosStore().perfis.some((item) => item.id === dados.perfilId))
-      throw new Error('Perfil não encontrado.')
+    validarRelacoesDoTopico(dados)
     const indice = topicos.value.findIndex((item) => item.id === id)
     if (indice >= 0) topicos.value[indice] = { ...dados, id }
   }

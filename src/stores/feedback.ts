@@ -5,18 +5,27 @@ export interface FeedbackAlert {
   id: string
   message: string
   duration: number
+  variant: 'success' | 'error'
 }
 
 export const useFeedbackStore = defineStore('feedback', () => {
   const alerts = ref<FeedbackAlert[]>([])
 
+  function show(message: string, variant: FeedbackAlert['variant'], duration: number) {
+    alerts.value.push({ id: crypto.randomUUID(), message, duration, variant })
+  }
+
   function success(message: string, duration = 5_000) {
-    alerts.value.push({ id: crypto.randomUUID(), message, duration })
+    show(message, 'success', duration)
+  }
+
+  function error(message: string, duration = 7_000) {
+    show(message, 'error', duration)
   }
 
   function dismiss(id: string) {
     alerts.value = alerts.value.filter((alert) => alert.id !== id)
   }
 
-  return { alerts, success, dismiss }
+  return { alerts, success, error, dismiss }
 })
