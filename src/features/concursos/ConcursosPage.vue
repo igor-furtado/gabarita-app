@@ -10,7 +10,7 @@ import {
   type SortingState,
 } from '@tanstack/vue-table'
 import { ArrowUpDown, ChevronRight, Search } from '@lucide/vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Input from '@/components/ui/Input.vue'
@@ -27,7 +27,6 @@ interface ConcursoLinha {
 const store = useConcursosStore()
 const feedback = useFeedbackStore()
 const { concursos } = storeToRefs(store)
-const router = useRouter()
 const busca = ref('')
 const sorting = ref<SortingState>([])
 const dados = computed(() => {
@@ -142,10 +141,7 @@ function criarConcurso(dados: Parameters<typeof store.criarOrgao>[0]) {
             <tr
               v-for="row in table.getRowModel().rows"
               :key="row.id"
-              class="cursor-pointer transition hover:bg-slate-50"
-              tabindex="0"
-              @click="router.push(`/concursos/${row.original.orgao.id}`)"
-              @keydown.enter="router.push(`/concursos/${row.original.orgao.id}`)"
+              class="transition hover:bg-slate-50"
             >
               <td class="px-4 py-4 font-bold text-slate-950">{{ row.original.orgao.sigla }}</td>
               <td class="px-4 py-4 text-slate-600">{{ row.original.orgao.nome }}</td>
@@ -155,7 +151,15 @@ function criarConcurso(dados: Parameters<typeof store.criarOrgao>[0]) {
                 }}</Badge>
               </td>
               <td class="px-4 py-4 text-slate-600">{{ row.original.edital?.banca ?? '—' }}</td>
-              <td class="px-4 py-4 text-slate-400"><ChevronRight class="size-4" /></td>
+              <td class="px-2 py-2 text-slate-400">
+                <RouterLink
+                  :to="`/concursos/${row.original.orgao.id}`"
+                  class="inline-flex rounded-lg p-2 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                  :aria-label="`Abrir concurso ${row.original.orgao.sigla}`"
+                >
+                  <ChevronRight class="size-4" />
+                </RouterLink>
+              </td>
             </tr>
           </tbody>
         </table>

@@ -1,12 +1,38 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { CheckCircle2, CircleAlert, X } from '@lucide/vue'
-import { useTimeoutFn } from '@vueuse/core'
+import { useIntervalFn } from '@vueuse/core'
 import type { FeedbackAlert } from '@/stores/feedback'
 
 const props = defineProps<{ alert: FeedbackAlert }>()
 const emit = defineEmits<{ dismiss: [] }>()
+const remaining = ref(props.alert.duration)
+const hovered = ref(false)
+const focused = ref(false)
+const progress = computed(() => Math.round((remaining.value / props.alert.duration) * 100))
 
-useTimeoutFn(() => emit('dismiss'), props.alert.duration)
+const { pause, resume } = useIntervalFn(() => {
+  remaining.value = Math.max(0, remaining.value - 100)
+  if (remaining.value === 0) {
+    pause()
+    emit('dismiss')
+  }
+}, 100)
+
+function syncTimer() {
+  if (hovered.value || focused.value) pause()
+  else resume()
+}
+
+function setHovered(value: boolean) {
+  hovered.value = value
+  syncTimer()
+}
+
+function setFocused(value: boolean) {
+  focused.value = value
+  syncTimer()
+}
 </script>
 
 <template>
@@ -15,6 +41,10 @@ useTimeoutFn(() => emit('dismiss'), props.alert.duration)
     :data-variant="alert.variant"
     class="pointer-events-auto relative w-full overflow-hidden rounded-xl border bg-white p-4 pr-11 shadow-xl shadow-slate-900/10"
     :class="alert.variant === 'error' ? 'border-red-200' : 'border-emerald-200'"
+    @mouseenter="setHovered(true)"
+    @mouseleave="setHovered(false)"
+    @focusin="setFocused(true)"
+    @focusout="setFocused(false)"
   >
     <div class="flex items-start gap-3">
       <CircleAlert
@@ -41,23 +71,15 @@ useTimeoutFn(() => emit('dismiss'), props.alert.duration)
       :class="alert.variant === 'error' ? 'bg-red-100' : 'bg-emerald-100'"
       role="progressbar"
       aria-label="Tempo restante do alerta"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-valuenow="progress"
     >
       <span
         class="block h-full origin-left"
         :class="alert.variant === 'error' ? 'bg-red-600' : 'bg-emerald-600'"
-        :style="{ animation: `alert-progress ${alert.duration}ms linear forwards` }"
+        :style="{ width: `${progress}%` }"
       />
     </div>
   </li>
 </template>
-
-<style>
-@keyframes alert-progress {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-</style>

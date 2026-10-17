@@ -18,7 +18,7 @@ test('fluxo principal do MVP funciona sem erros visíveis', async ({ page }) => 
   await page.getByRole('button', { name: 'Criar concurso' }).click()
   await expect(page.getByText('ALECE foi adicionado.')).toBeVisible()
 
-  await page.getByRole('cell', { name: 'ALECE' }).click()
+  await page.getByRole('link', { name: 'Abrir concurso ALECE' }).click()
   await expect(page.getByRole('heading', { name: 'ALECE' })).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar edital' }).click()
   await page.getByLabel('Título').fill('Concurso ALECE 2026')
