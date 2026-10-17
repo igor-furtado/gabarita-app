@@ -1,0 +1,50 @@
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import { disciplinasIniciais, topicosIniciais } from '@/mocks/data'
+import type { Disciplina, Topico } from '@/types/domain'
+
+export const useDisciplinasStore = defineStore('disciplinas', () => {
+  const disciplinas = ref<Disciplina[]>(structuredClone(disciplinasIniciais))
+  const topicos = ref<Topico[]>(structuredClone(topicosIniciais))
+  const ordenadas = computed(() => [...disciplinas.value].sort((a, b) => a.ordem - b.ordem))
+
+  function adicionarDisciplina(dados: Omit<Disciplina, 'id'>) {
+    disciplinas.value.push({ ...dados, id: crypto.randomUUID() })
+  }
+  function editarDisciplina(id: string, dados: Omit<Disciplina, 'id'>) {
+    const indice = disciplinas.value.findIndex((item) => item.id === id)
+    if (indice >= 0) disciplinas.value[indice] = { ...dados, id }
+  }
+  function excluirDisciplina(id: string) {
+    topicos.value = topicos.value.filter((item) => item.disciplinaId !== id)
+    disciplinas.value = disciplinas.value.filter((item) => item.id !== id)
+  }
+  function adicionarTopico(dados: Omit<Topico, 'id'>) {
+    if (!disciplinas.value.some((item) => item.id === dados.disciplinaId))
+      throw new Error('Disciplina não encontrada.')
+    topicos.value.push({ ...dados, id: crypto.randomUUID() })
+  }
+  function editarTopico(id: string, dados: Omit<Topico, 'id'>) {
+    const indice = topicos.value.findIndex((item) => item.id === id)
+    if (indice >= 0) topicos.value[indice] = { ...dados, id }
+  }
+  function excluirTopico(id: string) {
+    topicos.value = topicos.value.filter((item) => item.id !== id)
+  }
+  function alternarConclusao(id: string) {
+    const topico = topicos.value.find((item) => item.id === id)
+    if (topico) topico.concluido = !topico.concluido
+  }
+  return {
+    disciplinas,
+    topicos,
+    ordenadas,
+    adicionarDisciplina,
+    editarDisciplina,
+    excluirDisciplina,
+    adicionarTopico,
+    editarTopico,
+    excluirTopico,
+    alternarConclusao,
+  }
+})

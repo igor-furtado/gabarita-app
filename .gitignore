@@ -1,0 +1,28 @@
+# Dependências
+node_modules/
+
+# Builds e caches
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Artefatos de testes
+playwright-report/
+test-results/
+blob-report/
+
+# Variáveis de ambiente locais
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# Editores e sistema operacional
+.idea/
+.vscode/
+.DS_Store
