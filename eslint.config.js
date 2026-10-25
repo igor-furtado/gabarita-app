@@ -1,36 +1,47 @@
-import js from '@eslint/js'
-import prettier from 'eslint-config-prettier'
-import tseslint from 'typescript-eslint'
-import vue from 'eslint-plugin-vue'
-
-export default tseslint.config(
+import js from "@eslint/js";
+import ts from "typescript-eslint";
+import vue from "eslint-plugin-vue";
+export default ts.config(
   {
-    ignores: ['dist', 'coverage', 'playwright-report', 'test-results', 'eslint.config.js'],
+    ignores: [
+      "dist/**",
+      "dist-server/**",
+      "node_modules/**",
+      "src/api/**",
+      "test-results/**",
+      "playwright-report/**",
+    ],
   },
   js.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  ...vue.configs['flat/recommended'],
+  ...ts.configs.recommended,
+  ...vue.configs["flat/recommended"],
   {
-    files: ['**/*.{ts,vue}'],
+    files: ["**/*.vue"],
+    languageOptions: { parserOptions: { parser: ts.parser } },
+    rules: {
+      "vue/multi-word-component-names": "off",
+      "vue/multiline-html-element-content-newline": "off",
+      "vue/html-self-closing": "off",
+      "vue/max-attributes-per-line": "off",
+      "vue/singleline-html-element-content-newline": "off",
+      "vue/html-indent": "off",
+      "vue/first-attribute-linebreak": "off",
+      "vue/html-closing-bracket-newline": "off",
+      "vue/attributes-order": "off",
+    },
+  },
+  {
     languageOptions: {
-      parserOptions: {
-        parser: tseslint.parser,
-        projectService: true,
-        extraFileExtensions: ['.vue'],
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        crypto: "readonly",
+        setTimeout: "readonly",
+        URL: "readonly",
+        Blob: "readonly",
+        document: "readonly",
       },
     },
-    rules: {
-      '@typescript-eslint/no-confusing-void-expression': 'off',
-      '@typescript-eslint/no-misused-promises': 'off',
-      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      'vue/multi-word-component-names': 'off',
-      'vue/attributes-order': 'off',
-      'vue/max-attributes-per-line': 'off',
-    },
+    rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   },
-  {
-    files: ['**/*.test.ts'],
-    rules: { '@typescript-eslint/unbound-method': 'off' },
-  },
-  prettier,
-)
+);

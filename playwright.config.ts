@@ -1,14 +1,14 @@
-import { defineConfig, devices } from '@playwright/test'
-
+import { defineConfig } from "@playwright/test";
+const externalUrl = process.env.E2E_BASE_URL;
 export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: true,
-  reporter: 'html',
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'on-first-retry' },
-  webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: true,
-  },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-})
+  testDir: "./e2e",
+  use: { baseURL: externalUrl ?? "http://127.0.0.1:5173", headless: true },
+  webServer: externalUrl
+    ? undefined
+    : {
+        command: "pnpm dev",
+        url: "http://127.0.0.1:5173",
+        reuseExistingServer: true,
+      },
+  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+});

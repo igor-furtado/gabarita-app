@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gabarita
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gabarita_local}
+      POSTGRES_DB: gabarita
+    ports: ["127.0.0.1:5442:5432"]
+    volumes: ["gabarita_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gabarita"]
+      interval: 3s
+      retries: 20
+  app:
+    build: .
+    profiles: ["full"]
+    environment:
+      DATABASE_URL: postgres://gabarita:${POSTGRES_PASSWORD:-gabarita_local}@db:5432/gabarita
+      HOST: 0.0.0.0
+      NODE_ENV: production
+    ports: ["127.0.0.1:${APP_PORT:-3001}:3001"]
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  gabarita_data:
