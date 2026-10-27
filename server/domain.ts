@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  activeContests,
+  rankedCandidates,
+  relevantTopics,
+  explainCandidate,
+} from "./planning.js";
 export const subjectSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
@@ -15,7 +21,7 @@ export const subjectSchema = z.object({
 });
 export const profileSchema = z.object({
   name: z.string().min(1),
-  target: z.string().min(1),
+  target: z.string(),
   examDate: z
     .string()
     .refine((v) => v === "" || validDate(v), "Data inválida."),
@@ -60,8 +66,30 @@ export const reminderSchema = z.object({
   streak: z.number().int().min(0),
   marked: z.boolean(),
 });
+export const contestSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(160),
+  role: z.string().trim().max(160),
+  vacancies: z.number().int().min(0).nullable(),
+  salary: z.number().min(0).nullable(),
+  educationLevel: z.enum(["", "medio", "tecnico", "superior"]),
+  examDate: z
+    .string()
+    .refine((v) => v === "" || validDate(v), "Data inválida."),
+  archived: z.boolean(),
+  subjects: z.array(
+    z.object({
+      subjectId: z.string().uuid(),
+      weight: z.number().min(1).max(10),
+      allTopics: z.boolean(),
+      topicIds: z.array(z.string().uuid()),
+    }),
+  ),
+});
+export type Contest = z.infer<typeof contestSchema>;
 export const stateSchema = z.object({
   profile: profileSchema,
+  contests: z.array(contestSchema).optional(),
   subjects: z.array(subjectSchema),
   sessions: z.array(sessionSchema),
   reviews: z.array(reviewSchema),
@@ -70,6 +98,7 @@ export const stateSchema = z.object({
 });
 export type State = z.infer<typeof stateSchema>;
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("contest"), contest: contestSchema }),
   z.object({ type: z.literal("profile"), profile: profileSchema }),
   z.object({
     type: z.literal("subject"),
@@ -102,6 +131,16 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("topic"),
     subjectId: z.string().uuid(),
     name: z.string().min(1).max(200),
+  }),
+  z.object({
+    type: z.literal("topics"),
+    subjectId: z.string().uuid(),
+    names: z.array(z.string().trim().min(1).max(200)).min(1).max(100),
+  }),
+  z.object({
+    type: z.literal("reorderTopics"),
+    subjectId: z.string().uuid(),
+    topicIds: z.array(z.string().uuid()).min(1),
   }),
   z.object({ type: z.literal("session"), session: sessionSchema }),
   z.object({
@@ -178,14 +217,22 @@ export function phase(s: State, date = today()) {
     0,
     Math.floor((Date.parse(date) - Date.parse(s.profile.startDate)) / 86400000),
   );
-  const remaining = s.profile.examDate
-    ? Math.ceil((Date.parse(s.profile.examDate) - Date.parse(date)) / 86400000)
+  const examDate = s.contests?.length
+    ? activeContests(s, date)[0]?.examDate
+    : s.profile.examDate;
+  const remaining = examDate
+    ? Math.ceil((Date.parse(examDate) - Date.parse(date)) / 86400000)
     : null;
   if (remaining === null) {
     const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
-    const selected = [...s.subjects]
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, limit);
+    const ids = [
+      ...new Set(rankedCandidates(s, date).map((c) => c.subject.id)),
+    ].slice(0, limit);
+    const selected = s.contests?.length
+      ? s.subjects
+          .filter((sub) => ids.includes(sub.id))
+          .map((sub) => ({ ...sub, topics: relevantTopics(s, sub.id, date) }))
+      : [...s.subjects].sort((a, b) => b.weight - a.weight).slice(0, limit);
     return selected.length > 0 &&
       selected.every(
         (sub) => sub.topics.length > 0 && sub.topics.every((t) => t.read),
@@ -231,11 +278,63 @@ export function validateReview(
 
 export function recommendation(s: State, date = today()) {
   if (new Date(date + "T12:00:00Z").getUTCDay() === 0)
-    return { kind: "rest" as const };
+    return {
+      kind: "rest" as const,
+      reason: "Domingo é reservado ao descanso na metodologia.",
+    };
   const due = s.reviews
     .filter((r) => !r.done && r.due <= date)
     .sort((a, b) => a.due.localeCompare(b.due))[0];
-  if (due) return { kind: "review" as const, review: due };
+  if (due)
+    return {
+      kind: "review" as const,
+      review: due,
+      reason:
+        "Revisão vencida ou prevista para hoje: preservar a memória vem antes de avançar no edital.",
+    };
+  if (s.contests?.length) {
+    const candidates = rankedCandidates(s, date).filter(
+      ({ subject, topic }) =>
+        !topic.read ||
+        (!topic.mastered &&
+          !s.reviews.some((r) => r.topicId === topic.id && !r.done) &&
+          relevantTopics(s, subject.id, date).every((t) => t.read)),
+    );
+    const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
+    const subjectIds = [...new Set(candidates.map((c) => c.subject.id))].slice(
+      0,
+      limit,
+    );
+    for (const candidate of candidates.filter((c) =>
+      subjectIds.includes(c.subject.id),
+    )) {
+      const { subject, topic } = candidate;
+      if (!topic.read)
+        return {
+          kind: "reading" as const,
+          subject,
+          topic,
+          reason: explainCandidate(candidate),
+        };
+      if (
+        !topic.mastered &&
+        !s.reviews.some((r) => r.topicId === topic.id && !r.done) &&
+        relevantTopics(s, subject.id, date).every((t) => t.read)
+      )
+        return {
+          kind: "active" as const,
+          subject,
+          topic,
+          reason: explainCandidate(candidate),
+        };
+    }
+    return {
+      kind: "organize" as const,
+      reason: activeContests(s, date).length
+        ? "Os conteúdos selecionados estão em dia ou aguardando revisão. Confira os tópicos dos seus editais."
+        : "Nenhum concurso ativo com prova futura. Cadastre um concurso ou atualize as datas.",
+    };
+  }
   const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
   const eligible = [...s.subjects]
     .sort((a, b) => b.weight - a.weight)
@@ -247,14 +346,30 @@ export function recommendation(s: State, date = today()) {
   ];
   for (const subject of ordered) {
     const topic = subject.topics.find((t) => !t.read);
-    if (topic) return { kind: "reading" as const, subject, topic };
+    if (topic)
+      return {
+        kind: "reading" as const,
+        subject,
+        topic,
+        reason:
+          "Primeira leitura, considerando o peso da matéria e a alternância.",
+      };
   }
   for (const subject of ordered) {
     const topic = subject.topics.find(
       (t) =>
         !t.mastered && !s.reviews.some((r) => r.topicId === t.id && !r.done),
     );
-    if (topic) return { kind: "active" as const, subject, topic };
+    if (topic)
+      return {
+        kind: "active" as const,
+        subject,
+        topic,
+        reason: "Leitura concluída: avance para a recuperação ativa.",
+      };
   }
-  return { kind: "organize" as const };
+  return {
+    kind: "organize" as const,
+    reason: "Organize suas matérias e vincule os conteúdos aos seus concursos.",
+  };
 }

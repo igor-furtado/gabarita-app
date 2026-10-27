@@ -33,8 +33,7 @@
                               "minLength": 1
                             },
                             "target": {
-                              "type": "string",
-                              "minLength": 1
+                              "type": "string"
                             },
                             "examDate": {
                               "type": "string"
@@ -60,6 +59,102 @@
                             "configured"
                           ],
                           "additionalProperties": false
+                        },
+                        "contests": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "role": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "vacancies": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "nullable": true
+                              },
+                              "salary": {
+                                "type": "number",
+                                "minimum": 0,
+                                "nullable": true
+                              },
+                              "educationLevel": {
+                                "type": "string",
+                                "enum": [
+                                  "",
+                                  "medio",
+                                  "tecnico",
+                                  "superior"
+                                ]
+                              },
+                              "examDate": {
+                                "type": "string"
+                              },
+                              "archived": {
+                                "type": "boolean"
+                              },
+                              "subjects": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "subjectId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "weight": {
+                                      "type": "number",
+                                      "minimum": 1,
+                                      "maximum": 10
+                                    },
+                                    "allTopics": {
+                                      "type": "boolean"
+                                    },
+                                    "topicIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "subjectId",
+                                    "weight",
+                                    "allTopics",
+                                    "topicIds"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "role",
+                              "vacancies",
+                              "salary",
+                              "educationLevel",
+                              "examDate",
+                              "archived",
+                              "subjects"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "subjects": {
                           "type": "array",
@@ -372,6 +467,115 @@
                           "type": {
                             "type": "string",
                             "enum": [
+                              "contest"
+                            ]
+                          },
+                          "contest": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "role": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "vacancies": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "nullable": true
+                              },
+                              "salary": {
+                                "type": "number",
+                                "minimum": 0,
+                                "nullable": true
+                              },
+                              "educationLevel": {
+                                "type": "string",
+                                "enum": [
+                                  "",
+                                  "medio",
+                                  "tecnico",
+                                  "superior"
+                                ]
+                              },
+                              "examDate": {
+                                "type": "string"
+                              },
+                              "archived": {
+                                "type": "boolean"
+                              },
+                              "subjects": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "subjectId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "weight": {
+                                      "type": "number",
+                                      "minimum": 1,
+                                      "maximum": 10
+                                    },
+                                    "allTopics": {
+                                      "type": "boolean"
+                                    },
+                                    "topicIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "subjectId",
+                                    "weight",
+                                    "allTopics",
+                                    "topicIds"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "role",
+                              "vacancies",
+                              "salary",
+                              "educationLevel",
+                              "examDate",
+                              "archived",
+                              "subjects"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "contest"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
                               "profile"
                             ]
                           },
@@ -383,8 +587,7 @@
                                 "minLength": 1
                               },
                               "target": {
-                                "type": "string",
-                                "minLength": 1
+                                "type": "string"
                               },
                               "examDate": {
                                 "type": "string"
@@ -560,6 +763,69 @@
                           "type",
                           "subjectId",
                           "name"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "topics"
+                            ]
+                          },
+                          "subjectId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "names": {
+                            "minItems": 1,
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "subjectId",
+                          "names"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "reorderTopics"
+                            ]
+                          },
+                          "subjectId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "topicIds": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "subjectId",
+                          "topicIds"
                         ],
                         "additionalProperties": false
                       },
@@ -874,8 +1140,7 @@
                               "minLength": 1
                             },
                             "target": {
-                              "type": "string",
-                              "minLength": 1
+                              "type": "string"
                             },
                             "examDate": {
                               "type": "string"
@@ -901,6 +1166,102 @@
                             "configured"
                           ],
                           "additionalProperties": false
+                        },
+                        "contests": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "role": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "vacancies": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "nullable": true
+                              },
+                              "salary": {
+                                "type": "number",
+                                "minimum": 0,
+                                "nullable": true
+                              },
+                              "educationLevel": {
+                                "type": "string",
+                                "enum": [
+                                  "",
+                                  "medio",
+                                  "tecnico",
+                                  "superior"
+                                ]
+                              },
+                              "examDate": {
+                                "type": "string"
+                              },
+                              "archived": {
+                                "type": "boolean"
+                              },
+                              "subjects": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "subjectId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "weight": {
+                                      "type": "number",
+                                      "minimum": 1,
+                                      "maximum": 10
+                                    },
+                                    "allTopics": {
+                                      "type": "boolean"
+                                    },
+                                    "topicIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "subjectId",
+                                    "weight",
+                                    "allTopics",
+                                    "topicIds"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "role",
+                              "vacancies",
+                              "salary",
+                              "educationLevel",
+                              "examDate",
+                              "archived",
+                              "subjects"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "subjects": {
                           "type": "array",

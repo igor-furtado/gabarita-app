@@ -1,6 +1,10 @@
+import { relevantTopics } from "./planning.js";
 import { and, eq, sql, asc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
+  contests,
+  contestSubjects,
+  contestTopics,
   workspaces,
   profiles,
   studyPlans,
@@ -41,15 +45,13 @@ export async function initializeWorkspace(db: Database, workspaceId = 1) {
       .insert(studyPlans)
       .values({ workspaceId, startDate: today() })
       .returning();
-    await tx
-      .insert(subjects)
-      .values(
-        names.map((name, position) => ({
-          planId: plan!.id,
-          name,
-          weight: position < 5 ? 3 : 1,
-        })),
-      );
+    await tx.insert(subjects).values(
+      names.map((name, position) => ({
+        planId: plan!.id,
+        name,
+        weight: position < 5 ? 3 : 1,
+      })),
+    );
   });
 }
 
@@ -57,6 +59,7 @@ export async function initializeWorkspace(db: Database, workspaceId = 1) {
 export async function readWorkspace(
   db: Executor,
   workspaceId = 1,
+  includeContests = true,
 ): Promise<{ version: number; data: State }> {
   const [header] = await db
     .select({
@@ -118,9 +121,60 @@ export async function readWorkspace(
     list.push({ id: t.id, name: t.name, read: t.read, mastered: t.mastered });
     bySubject.set(t.subjectId, list);
   }
+  const contestRows = includeContests
+    ? await db
+        .select()
+        .from(contests)
+        .where(eq(contests.planId, planId))
+        .orderBy(asc(contests.createdAt), asc(contests.id))
+    : [];
+  const links = includeContests
+    ? await db
+        .select({ row: contestSubjects })
+        .from(contestSubjects)
+        .innerJoin(contests, eq(contestSubjects.contestId, contests.id))
+        .where(eq(contests.planId, planId))
+        .orderBy(asc(contestSubjects.subjectId))
+    : [];
+  const selections = includeContests
+    ? await db
+        .select({ row: contestTopics })
+        .from(contestTopics)
+        .innerJoin(contests, eq(contestTopics.contestId, contests.id))
+        .where(eq(contests.planId, planId))
+        .orderBy(asc(contestTopics.topicId))
+    : [];
   return {
     version: header.version,
     data: {
+      ...(includeContests
+        ? {
+            contests: contestRows.map((c) => ({
+              id: c.id,
+              name: c.name,
+              role: c.role,
+              vacancies: c.vacancies,
+              salary: c.salary,
+              educationLevel: c.educationLevel ?? "",
+              examDate: c.examDate ?? "",
+              archived: c.archived,
+              subjects: links
+                .filter((l) => l.row.contestId === c.id)
+                .map(({ row: l }) => ({
+                  subjectId: l.subjectId,
+                  weight: l.weight,
+                  allTopics: l.allTopics,
+                  topicIds: selections
+                    .filter(
+                      (t) =>
+                        t.row.contestId === c.id &&
+                        t.row.subjectId === l.subjectId,
+                    )
+                    .map((t) => t.row.topicId),
+                })),
+            })),
+          }
+        : {}),
       profile: {
         name: header.name,
         target: header.plan.target,
@@ -206,26 +260,22 @@ export async function importLegacyWorkspace(
     })
     .returning();
   for (const [position, sub] of s.subjects.entries()) {
-    await tx
-      .insert(subjects)
-      .values({
-        id: sub.id,
-        planId: plan!.id,
-        name: sub.name,
-        weight: sub.weight,
-        materialUrl: sub.materialUrl ?? null,
-        position,
-      });
+    await tx.insert(subjects).values({
+      id: sub.id,
+      planId: plan!.id,
+      name: sub.name,
+      weight: sub.weight,
+      materialUrl: sub.materialUrl ?? null,
+      position,
+    });
     if (sub.topics.length)
-      await tx
-        .insert(topics)
-        .values(
-          sub.topics.map((t, position) => ({
-            ...t,
-            subjectId: sub.id,
-            position,
-          })),
-        );
+      await tx.insert(topics).values(
+        sub.topics.map((t, position) => ({
+          ...t,
+          subjectId: sub.id,
+          position,
+        })),
+      );
   }
   for (const [position, sess] of s.sessions.entries()) {
     const { subjectId, ...row } = sess;
@@ -303,6 +353,77 @@ export async function executeRelationalCommand(
       return topic;
     };
     switch (c.type) {
+      case "contest": {
+        const data = c.contest;
+        const [existing] = await tx
+          .select()
+          .from(contests)
+          .where(eq(contests.id, data.id));
+        if (existing && existing.planId !== plan.id)
+          throw new DomainError("Concurso não encontrado.");
+        if (
+          new Set(data.subjects.map((s) => s.subjectId)).size !==
+          data.subjects.length
+        )
+          throw new DomainError("Matéria repetida no edital.");
+        for (const link of data.subjects) {
+          await getSubject(link.subjectId);
+          if (link.allTopics && link.topicIds.length)
+            throw new DomainError(
+              "Selecione todos os tópicos ou uma lista específica.",
+            );
+          if (!link.allTopics && !link.topicIds.length)
+            throw new DomainError("Selecione pelo menos um tópico.");
+          if (new Set(link.topicIds).size !== link.topicIds.length)
+            throw new DomainError("Tópico repetido.");
+          for (const id of link.topicIds) await getTopic(id, link.subjectId);
+        }
+        await tx
+          .insert(contests)
+          .values({
+            id: data.id,
+            planId: plan.id,
+            name: data.name,
+            role: data.role,
+            vacancies: data.vacancies,
+            salary: data.salary,
+            educationLevel: data.educationLevel || null,
+            examDate: data.examDate || null,
+            archived: data.archived,
+          })
+          .onConflictDoUpdate({
+            target: contests.id,
+            set: {
+              name: data.name,
+              role: data.role,
+              vacancies: data.vacancies,
+              salary: data.salary,
+              educationLevel: data.educationLevel || null,
+              examDate: data.examDate || null,
+              archived: data.archived,
+            },
+          });
+        await tx
+          .delete(contestSubjects)
+          .where(eq(contestSubjects.contestId, data.id));
+        for (const link of data.subjects) {
+          await tx.insert(contestSubjects).values({
+            contestId: data.id,
+            subjectId: link.subjectId,
+            weight: link.weight,
+            allTopics: link.allTopics,
+          });
+          if (link.topicIds.length)
+            await tx.insert(contestTopics).values(
+              link.topicIds.map((topicId) => ({
+                contestId: data.id,
+                subjectId: link.subjectId,
+                topicId,
+              })),
+            );
+        }
+        break;
+      }
       case "profile": {
         await tx
           .update(profiles)
@@ -347,6 +468,33 @@ export async function executeRelationalCommand(
           .values({ subjectId: c.subjectId, name: c.name });
         break;
       }
+      case "topics": {
+        await getSubject(c.subjectId);
+        await tx
+          .insert(topics)
+          .values(c.names.map((name) => ({ subjectId: c.subjectId, name })));
+        break;
+      }
+      case "reorderTopics": {
+        await getSubject(c.subjectId);
+        const current = await tx
+          .select({ id: topics.id })
+          .from(topics)
+          .where(eq(topics.subjectId, c.subjectId));
+        const currentIds = new Set(current.map((topic) => topic.id));
+        if (
+          c.topicIds.length !== current.length ||
+          new Set(c.topicIds).size !== c.topicIds.length ||
+          c.topicIds.some((id) => !currentIds.has(id))
+        )
+          throw new DomainError("A lista de tópicos está desatualizada.");
+        for (const [position, id] of c.topicIds.entries())
+          await tx
+            .update(topics)
+            .set({ position })
+            .where(and(eq(topics.id, id), eq(topics.subjectId, c.subjectId)));
+        break;
+      }
       case "editTopic":
         await getTopic(c.id, c.subjectId);
         await tx
@@ -376,7 +524,15 @@ export async function executeRelationalCommand(
             ),
           )
           .limit(1);
-        validateSession(session, unread.length === 0);
+        const snapshot = (await readWorkspace(tx, workspaceId)).data;
+        const scope = relevantTopics(snapshot, session.subjectId, today());
+        validateSession(
+          session,
+          snapshot.contests?.length &&
+            scope.some((t) => t.id === session.topicId)
+            ? scope.every((t) => t.read)
+            : unread.length === 0,
+        );
         const { subjectId: ignoredSubjectId, ...row } = session;
         void ignoredSubjectId;
         await tx.insert(studySessions).values({ ...row, date: today() });
@@ -397,13 +553,11 @@ export async function executeRelationalCommand(
 
           for (const interval of [1, 7, 30])
             if (!pending.some((r) => r.interval === interval))
-              await tx
-                .insert(reviews)
-                .values({
-                  topicId: session.topicId,
-                  due: addDays(today(), interval),
-                  interval,
-                });
+              await tx.insert(reviews).values({
+                topicId: session.topicId,
+                due: addDays(today(), interval),
+                interval,
+              });
         }
         break;
       }
@@ -428,38 +582,32 @@ export async function executeRelationalCommand(
             .set({ mastered })
             .where(eq(topics.id, entry.review.topicId));
           if (!mastered)
-            await tx
-              .insert(reviews)
-              .values({
-                topicId: entry.review.topicId,
-                interval: 30,
-                due: addDays(today(), 7),
-              });
+            await tx.insert(reviews).values({
+              topicId: entry.review.topicId,
+              interval: 30,
+              due: addDays(today(), 7),
+            });
         }
         if (c.questions)
-          await tx
-            .insert(studySessions)
-            .values({
-              topicId: entry.review.topicId,
-              date: today(),
-              minutes: entry.review.interval === 30 ? 20 : 10,
-              recall: "Revisão concluída",
-              questions: c.questions,
-              correct: c.correct,
-              kind: "mock",
-            });
+          await tx.insert(studySessions).values({
+            topicId: entry.review.topicId,
+            date: today(),
+            minutes: entry.review.interval === 30 ? 20 : 10,
+            recall: "Revisão concluída",
+            questions: c.questions,
+            correct: c.correct,
+            kind: "mock",
+          });
         break;
       }
       case "error": {
         await getSubject(c.error.subjectId);
         const { reason, ...row } = c.error;
-        await tx
-          .insert(errorEntries)
-          .values({
-            ...row,
-            reasonId: await reasonId(tx, reason),
-            date: today(),
-          });
+        await tx.insert(errorEntries).values({
+          ...row,
+          reasonId: await reasonId(tx, reason),
+          date: today(),
+        });
         break;
       }
       case "resolve": {

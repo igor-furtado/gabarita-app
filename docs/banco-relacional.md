@@ -79,3 +79,19 @@ Antes da troca no ambiente em uso, pare a aplicação antiga e faça `pg_dump`. 
 ## DBeaver
 
 A conexão permanece `localhost:5442`, banco `gabarita`, usuário `gabarita`. Atualize **Schemas → public → Tabelas** com F5. Abra o diagrama ER selecionando as tabelas: as linhas do diagrama serão obtidas das chaves estrangeiras reais. `workspaces` continua existindo, agora somente com metadados; a coluna `data` foi removida.
+
+## Concursos e editais compartilhados
+
+A migração `0002_contests` acrescenta três tabelas relacionais:
+
+- `contests`: concurso/cargo, data opcional, arquivamento e vínculo à preparação.
+- `contest_subjects`: associação entre concurso e matéria, peso específico e abrangência (matéria inteira ou tópicos selecionados). Chave primária composta impede matérias duplicadas no edital.
+- `contest_topics`: tópicos explicitamente selecionados. As chaves estrangeiras compostas garantem que o tópico pertence à matéria vinculada ao concurso.
+
+Índices cobrem consulta por preparação/data, associações por matéria e busca reversa por tópico. Nenhuma coluna JSON ou array é utilizada. A seleção “todos” é uma regra de abrangência: também inclui novos tópicos cadastrados na matéria.
+
+Matérias, materiais, sessões e revisões continuam únicos no acervo. Editar ou arquivar um concurso não apaga o estudo. A API valida que todas as entidades pertencem à mesma preparação; comandos são transacionais e usam a versão do espaço para rejeitar alterações concorrentes.
+
+O alvo antigo, quando preenchido, vira um concurso com todas as matérias atuais e seus pesos. `study_plans.target` e `study_plans.exam_date` ficam como campos legados de compatibilidade; não são usados pela interface nem pela priorização quando existem concursos. Novos objetivos devem ser cadastrados em `contests`.
+
+Antes da atualização local foi criado `backups/pre-contests-20261025.dump`, fora do Git. Migrações aplicadas são imutáveis e verificadas por checksum.

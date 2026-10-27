@@ -98,11 +98,25 @@ it("migra todos os campos, UUIDs, datas, versões e ordem; remove o documento", 
       applied: true,
       migratedWorkspaces: 2,
     });
-    expect(await readWorkspace(box.db, 1)).toEqual({
+    const migrated = await readWorkspace(box.db, 1);
+    expect(migrated.data.contests).toHaveLength(1);
+    expect(migrated.data.contests![0]).toMatchObject({
+      name: first.profile.target,
+      examDate: first.profile.examDate,
+      subjects: first.subjects
+        .map((s) => ({
+          subjectId: s.id,
+          weight: s.weight,
+          allTopics: true,
+          topicIds: [],
+        }))
+        .sort((a, b) => a.subjectId.localeCompare(b.subjectId)),
+    });
+    expect(await readWorkspace(box.db, 1, false)).toEqual({
       version: 42,
       data: first,
     });
-    expect(await readWorkspace(box.db, 2)).toEqual({
+    expect(await readWorkspace(box.db, 2, false)).toEqual({
       version: 7,
       data: second,
     });

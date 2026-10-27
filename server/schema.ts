@@ -11,6 +11,8 @@ import {
   index,
   uniqueIndex,
   check,
+  primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -46,10 +48,6 @@ export const studyPlans = pgTable(
   (t) => [
     uniqueIndex("study_plans_workspace_idx").on(t.workspaceId),
     check("study_plans_hours_check", sql`${t.weeklyHours} between 1 and 70`),
-    check(
-      "study_plans_target_check",
-      sql`not ${t.configured} or length(trim(${t.target})) > 0`,
-    ),
   ],
 );
 export const subjects = pgTable(
@@ -86,6 +84,7 @@ export const topics = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("topics_id_subject_idx").on(t.id, t.subjectId),
     index("topics_subject_position_idx").on(t.subjectId, t.position),
     check("topics_name_check", sql`length(trim(${t.name})) > 0`),
     check("topics_position_check", sql`${t.position} >= 0`),
@@ -210,5 +209,80 @@ export const reminders = pgTable(
       sql`${t.kind} in ('memorize','attention','jurisprudence','observation')`,
     ),
     check("reminders_position_check", sql`${t.position} >= 0`),
+  ],
+);
+
+export const contests = pgTable(
+  "contests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => studyPlans.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    role: text("role_name").notNull().default(""),
+    vacancies: integer("vacancies"),
+    salary: doublePrecision("salary"),
+    educationLevel: text("education_level", {
+      enum: ["medio", "tecnico", "superior"],
+    }),
+    examDate: date("exam_date"),
+    archived: boolean("archived").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("contests_plan_date_idx").on(t.planId, t.examDate),
+    check("contests_name_check", sql`length(trim(${t.name})) > 0`),
+    check(
+      "contests_vacancies_check",
+      sql`${t.vacancies} is null or ${t.vacancies} >= 0`,
+    ),
+    check(
+      "contests_salary_check",
+      sql`${t.salary} is null or ${t.salary} >= 0`,
+    ),
+    check(
+      "contests_education_level_check",
+      sql`${t.educationLevel} is null or ${t.educationLevel} in ('medio','tecnico','superior')`,
+    ),
+  ],
+);
+export const contestSubjects = pgTable(
+  "contest_subjects",
+  {
+    contestId: uuid("contest_id")
+      .notNull()
+      .references(() => contests.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    weight: doublePrecision("weight").notNull(),
+    allTopics: boolean("all_topics").notNull().default(true),
+  },
+  (t) => [
+    primaryKey({ columns: [t.contestId, t.subjectId] }),
+    index("contest_subjects_subject_idx").on(t.subjectId),
+    check("contest_subjects_weight_check", sql`${t.weight} between 1 and 10`),
+  ],
+);
+export const contestTopics = pgTable(
+  "contest_topics",
+  {
+    contestId: uuid("contest_id").notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    topicId: uuid("topic_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.contestId, t.topicId] }),
+    foreignKey({
+      columns: [t.contestId, t.subjectId],
+      foreignColumns: [contestSubjects.contestId, contestSubjects.subjectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.topicId, t.subjectId],
+      foreignColumns: [topics.id, topics.subjectId],
+    }).onDelete("cascade"),
+    index("contest_topics_subject_idx").on(t.contestId, t.subjectId),
+    index("contest_topics_topic_idx").on(t.topicId, t.subjectId),
   ],
 );

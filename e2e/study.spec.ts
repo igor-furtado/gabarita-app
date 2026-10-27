@@ -31,17 +31,34 @@ test("matéria, tópico e primeira leitura persistem após recarregar", async ({
   const card = page.locator("article").filter({
     has: page.getByRole("button", { name: `Editar ${name}`, exact: true }),
   });
-  await card.getByRole("button", { name: "Tópico", exact: true }).click();
+  await card.getByRole("button", { name: "Ver tópicos (0)" }).click();
+  await dialog.getByRole("button", { name: "Adicionar tópicos" }).click();
   await dialog
-    .getByLabel("Nome", { exact: true })
-    .fill("Teste de persistência");
+    .getByLabel("Tópicos um por linha", { exact: true })
+    .fill("Primeiro tópico\nSegundo tópico");
   await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
+  await card.getByRole("button", { name: "Ver tópicos (2)" }).click();
+  await dialog
+    .getByRole("button", { name: "Reposicionar Segundo tópico" })
+    .dragTo(dialog.locator(".topic-manager-list li").first());
+  await expect(dialog.locator(".topic-manager-name")).toHaveText([
+    "Segundo tópico",
+    "Primeiro tópico",
+  ]);
+  await dialog.getByRole("button", { name: "Fechar", exact: true }).click();
   await card.getByRole("button", { name: "Estudar", exact: true }).click();
   await dialog
     .getByRole("button", { name: "Concluir e salvar sessão" })
     .click();
+  await expect(dialog).not.toBeVisible();
+  await card.getByRole("button", { name: "Estudar", exact: true }).click();
+  await dialog.getByLabel("Tópico").selectOption({ label: "Primeiro tópico" });
+  await dialog
+    .getByRole("button", { name: "Concluir e salvar sessão" })
+    .click();
+  await expect(dialog).not.toBeVisible();
   await page.reload();
-  await expect(card).toContainText("1 de 1 tópicos lidos");
+  await expect(card).toContainText("2 de 2 tópicos lidos");
   await card.getByRole("button", { name: "Estudar", exact: true }).click();
   await dialog.getByLabel("Tipo de sessão").selectOption("active");
   await dialog

@@ -40,6 +40,7 @@ export default ts.config(
         URL: "readonly",
         Blob: "readonly",
         document: "readonly",
+        HTMLFormElement: "readonly",
       },
     },
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },

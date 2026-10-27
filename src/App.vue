@@ -26,6 +26,9 @@ import {
   ChevronRight,
   Target,
   Menu,
+  ArrowUpDown,
+  ListTree,
+  GripVertical,
 } from "lucide-vue-next";
 import {
   DialogRoot,
@@ -42,6 +45,8 @@ import {
   FlexRender,
   type ColumnDef,
 } from "@tanstack/vue-table";
+import ContestsPage from "./features/contests/ContestsPage.vue";
+import { activeContests } from "../server/planning";
 import Button from "./components/ui/button/Button.vue";
 import { useGetState, executeCommand } from "./api/generated";
 import {
@@ -60,6 +65,7 @@ const query = useGetState();
 const state = computed(() => query.data.value?.data as State | undefined);
 const nav = [
   { path: "/", label: "Meu dia", icon: LayoutDashboard },
+  { path: "/concursos", label: "Meus concursos", icon: Target },
   { path: "/plano", label: "Plano de estudo", icon: CalendarDays },
   { path: "/materias", label: "Matérias e tópicos", icon: BookOpen },
   { path: "/revisoes", label: "Revisões", icon: RotateCcw },
@@ -69,6 +75,9 @@ const nav = [
 ];
 const title = computed(
   () => nav.find((n) => n.path === route.path)?.label ?? "Meu planejamento",
+);
+const focusContest = computed(() =>
+  state.value ? activeContests(state.value, today())[0] : undefined,
 );
 const currentPhase = computed(() =>
   state.value ? phase(state.value) : "Fundação",
@@ -103,7 +112,12 @@ const limit = computed(() =>
         : 16,
 );
 const suggested = computed(() =>
-  state.value ? recommendation(state.value) : { kind: "organize" as const },
+  state.value
+    ? recommendation(state.value)
+    : {
+        kind: "organize" as const,
+        reason: "Cadastre seus concursos para começar.",
+      },
 );
 const nextTopic = computed(
   () =>
@@ -151,7 +165,10 @@ const modal = ref(""),
   pending = ref(false),
   notice = ref(""),
   mobile = ref(false),
-  search = ref("");
+  search = ref(""),
+  subjectOrder = ref<"alphabetical" | "weight" | "read-desc" | "read-asc">(
+    "weight",
+  );
 const profile = ref({
   name: "",
   target: "",
@@ -187,6 +204,27 @@ const activeSubject = computed(() =>
 );
 const selectedReview = ref("");
 const editingId = ref("");
+const draggedTopicId = ref("");
+const dragOverTopicId = ref("");
+type TopicDragEvent = {
+  dataTransfer: {
+    effectAllowed: string;
+    setData: (format: string, data: string) => void;
+    getData: (format: string) => string;
+  } | null;
+};
+type TopicPointerEvent = {
+  pointerType: string;
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  currentTarget: unknown;
+};
+type PointerCaptureTarget = {
+  setPointerCapture: (pointerId: number) => void;
+  hasPointerCapture: (pointerId: number) => boolean;
+  releasePointerCapture: (pointerId: number) => void;
+};
 const timer = useLocalStorage("gabarita-timer", { seconds: 0, running: false });
 useIntervalFn(() => {
   if (timer.value.running) timer.value.seconds++;
@@ -260,7 +298,14 @@ async function save() {
   else if (modal.value === "subject")
     command = { type: "subject", name: name.value, weight: weight.value };
   else if (modal.value === "topic")
-    command = { type: "topic", name: name.value, subjectId: subjectId.value };
+    command = {
+      type: "topics",
+      names: name.value
+        .split("\n")
+        .map((topic) => topic.trim())
+        .filter(Boolean),
+      subjectId: subjectId.value,
+    };
   else if (modal.value === "error")
     command = {
       type: "error",
@@ -328,6 +373,57 @@ function editTopic(
   editingId.value = t.id;
   name.value = t.name;
 }
+function beginTopicDrag(event: TopicDragEvent, id: string) {
+  draggedTopicId.value = id;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+  }
+}
+async function dropTopic(event: TopicDragEvent, targetId: string) {
+  const draggedId =
+    draggedTopicId.value || event.dataTransfer?.getData("text/plain") || "";
+  await reorderDraggedTopic(draggedId, targetId);
+}
+async function reorderDraggedTopic(draggedId: string, targetId: string) {
+  if (!activeSubject.value || pending.value) return;
+  const topicIds = activeSubject.value.topics.map((topic) => topic.id);
+  const from = topicIds.indexOf(draggedId);
+  const destination = topicIds.indexOf(targetId);
+  draggedTopicId.value = "";
+  dragOverTopicId.value = "";
+  if (from < 0 || destination < 0 || from === destination) return;
+  const [moved] = topicIds.splice(from, 1);
+  topicIds.splice(destination, 0, moved!);
+  await send({
+    type: "reorderTopics",
+    subjectId: activeSubject.value.id,
+    topicIds,
+  });
+}
+function beginPointerTopicDrag(event: TopicPointerEvent, id: string) {
+  if (event.pointerType === "mouse") return;
+  draggedTopicId.value = id;
+  (event.currentTarget as PointerCaptureTarget).setPointerCapture(
+    event.pointerId,
+  );
+}
+function trackPointerTopicDrag(event: TopicPointerEvent) {
+  if (event.pointerType === "mouse" || !draggedTopicId.value) return;
+  const row = globalThis.document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest("[data-topic-id]") as { dataset: { topicId?: string } } | null;
+  dragOverTopicId.value = row?.dataset.topicId ?? "";
+}
+async function finishPointerTopicDrag(event: TopicPointerEvent) {
+  if (event.pointerType === "mouse") return;
+  const targetId = dragOverTopicId.value;
+  const draggedId = draggedTopicId.value;
+  const target = event.currentTarget as PointerCaptureTarget;
+  if (target.hasPointerCapture(event.pointerId))
+    target.releasePointerCapture(event.pointerId);
+  await reorderDraggedTopic(draggedId, targetId);
+}
 function startSuggested() {
   const r = suggested.value;
   if (r.kind === "review") {
@@ -340,7 +436,13 @@ function startSuggested() {
     kind.value = r.kind;
     return;
   }
-  router.push(r.kind === "rest" ? "/progresso" : "/materias");
+  router.push(
+    r.kind === "rest"
+      ? "/progresso"
+      : state.value?.contests?.length
+        ? "/concursos"
+        : "/materias",
+  );
 }
 function review(id: string) {
   selectedReview.value = id;
@@ -359,11 +461,30 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
 }
-const filteredSubjects = computed(() =>
-  ranked.value.filter((s) =>
-    s.name.toLowerCase().includes(search.value.toLowerCase()),
-  ),
-);
+const filteredSubjects = computed(() => {
+  const subjects = (state.value?.subjects ?? []).filter((s) =>
+    s.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()),
+  );
+  const read = (subject: State["subjects"][number]) =>
+    subject.topics.filter((topic) => topic.read).length;
+  return subjects.sort((a, b) => {
+    if (subjectOrder.value === "alphabetical")
+      return a.name.localeCompare(b.name, "pt-BR");
+    if (subjectOrder.value === "read-desc")
+      return read(b) - read(a) || a.name.localeCompare(b.name, "pt-BR");
+    if (subjectOrder.value === "read-asc")
+      return read(a) - read(b) || a.name.localeCompare(b.name, "pt-BR");
+    return b.weight - a.weight || a.name.localeCompare(b.name, "pt-BR");
+  });
+});
+const modalDescription = computed(() => {
+  if (modal.value === "editSubject") return "";
+  if (modal.value === "topic")
+    return `Adicione um ou mais tópicos em ${activeSubject.value?.name ?? "esta matéria"}.`;
+  if (modal.value === "topicsList")
+    return "Arraste os tópicos pela alça lateral para definir a ordem de estudo.";
+  return "Salvo no seu espaço de estudo. Cada registro ajuda a orientar o próximo passo.";
+});
 const columns: ColumnDef<State["errors"][number]>[] = [
   {
     id: "subject",
@@ -428,6 +549,11 @@ const modalTitles: Record<string, string> = {
   reminder: "Guardar lembrete de véspera",
   review: "Concluir revisão",
 };
+const modalTitle = computed(() =>
+  modal.value === "topicsList"
+    ? (activeSubject.value?.name ?? "Tópicos")
+    : modalTitles[modal.value],
+);
 </script>
 
 <template>
@@ -476,7 +602,7 @@ const modalTitles: Record<string, string> = {
         <span>{{ state?.profile.name?.charAt(0) || "V" }}</span>
         <div>
           <strong>{{ state?.profile.name || "Seu próximo capítulo" }}</strong
-          ><small>{{ state?.profile.target || "Vamos começar?" }}</small>
+          ><small>{{ focusContest?.name || "Sua preparação" }}</small>
         </div>
       </div>
     </aside>
@@ -650,6 +776,9 @@ const modalTitles: Record<string, string> = {
                     }}</span
                   >
                 </div>
+                <p class="info-box recommendation-reason">
+                  {{ suggested.reason }}
+                </p>
                 <Button class="full" @click="startSuggested"
                   >{{
                     suggested.kind === "rest"
@@ -657,7 +786,7 @@ const modalTitles: Record<string, string> = {
                       : suggested.kind === "review"
                         ? "Fazer minha revisão"
                         : suggested.kind === "organize"
-                          ? "Organizar minhas matérias"
+                          ? "Organizar minha preparação"
                           : "Começar minha sessão"
                   }}
                   <ArrowRight :size="16"
@@ -753,6 +882,12 @@ const modalTitles: Record<string, string> = {
             </div>
           </div>
         </template>
+        <ContestsPage
+          v-else-if="route.path === '/concursos'"
+          :state="state"
+          :pending="pending"
+          :send="send"
+        />
         <template v-else-if="route.path === '/configuracoes'"
           ><div class="page-heading">
             <div>
@@ -776,24 +911,18 @@ const modalTitles: Record<string, string> = {
               >Como podemos chamar você?<input
                 v-model="profile.name"
                 required
-                placeholder="Seu nome" /></label
-            ><label
-              >Concurso ou cargo-alvo<input
-                v-model="profile.target"
-                required
-                placeholder="Ex.: Auditor fiscal — SEFAZ"
+                placeholder="Seu nome"
             /></label>
-            <div class="form-row">
-              <label
-                >Início do plano<input
-                  v-model="profile.startDate"
-                  type="date"
-                  required /></label
-              ><label
-                >Data da prova <small>opcional</small
-                ><input v-model="profile.examDate" type="date"
-              /></label>
+            <div class="info-box">
+              Seus concursos, datas de prova e editais ficam em
+              <RouterLink to="/concursos">Meus concursos</RouterLink>.
             </div>
+            <label
+              >Início do plano<input
+                v-model="profile.startDate"
+                type="date"
+                required
+            /></label>
             <label
               >Horas disponíveis por semana<input
                 v-model.number="profile.hours"
@@ -810,8 +939,8 @@ const modalTitles: Record<string, string> = {
                     ? "Foco nas 10 matérias de maior peso."
                     : "Tempo para trabalhar as 16 matérias da coleção."
               }}
-              Sem data definida, escolha um edital-alvo e conclua a leitura
-              antes das revisões.
+              A prioridade diária considera os seus editais e preserva as
+              revisões.
             </div>
             <Button :disabled="pending"
               >Salvar meu planejamento <Check :size="16"
@@ -835,7 +964,18 @@ const modalTitles: Record<string, string> = {
               v-model="search"
               placeholder="Buscar matéria…"
               aria-label="Buscar matéria"
-            /><span>{{ readCount }} de {{ totalTopics }} tópicos lidos</span>
+            />
+            <label class="sort-control">
+              <ArrowUpDown :size="16" />
+              <span>Ordenar por</span>
+              <select v-model="subjectOrder" aria-label="Ordenar matérias">
+                <option value="alphabetical">Ordem alfabética</option>
+                <option value="weight">Maior peso</option>
+                <option value="read-desc">Mais tópicos lidos</option>
+                <option value="read-asc">Menos tópicos lidos</option>
+              </select>
+            </label>
+            <span>{{ readCount }} de {{ totalTopics }} tópicos lidos</span>
           </div>
           <div class="subjects-grid">
             <article
@@ -848,7 +988,7 @@ const modalTitles: Record<string, string> = {
                   String(index + 1).padStart(2, "0")
                 }}</span
                 ><label class="weight-label"
-                  >Peso
+                  >Peso-base
                   <select
                     :value="s.weight"
                     :aria-label="`Peso de ${s.name}`"
@@ -899,19 +1039,11 @@ const modalTitles: Record<string, string> = {
                   }"
                 ></i>
               </div>
-              <ul class="topic-list">
-                <li v-for="t in s.topics" :key="t.id">
-                  <Check v-if="t.read" :size="16" /><span
-                    v-else
-                    class="empty-circle"
-                  /><button class="edit-name" @click="editTopic(s, t)">
-                    {{ t.name }}</button
-                  ><span v-if="t.mastered" class="pill">Dominado</span>
-                </li>
-              </ul>
               <div class="actions">
-                <Button variant="ghost" @click="open('topic', s.id)"
-                  ><Plus :size="15" /> Tópico</Button
+                <Button variant="ghost" @click="open('topicsList', s.id)"
+                  ><ListTree :size="15" /> Ver tópicos ({{
+                    s.topics.length
+                  }})</Button
                 ><Button
                   v-if="s.topics.length"
                   variant="outline"
@@ -935,13 +1067,13 @@ const modalTitles: Record<string, string> = {
           </div>
           <div class="info-box">
             {{
-              state.profile.examDate &&
+              focusContest?.examDate &&
               Math.ceil(
-                (Date.parse(state.profile.examDate) - Date.parse(today())) /
+                (Date.parse(focusContest.examDate) - Date.parse(today())) /
                   86400000,
               ) <= 30
                 ? "Rota curta: Revisões de Véspera → Alterações Legislativas → Julgados → Simulado."
-                : "Roteiro-base da coleção. A ordem diária usa o peso das suas matérias; adapte os tópicos ao seu edital."
+                : "Roteiro-base da coleção. A ordem diária considera a prova mais próxima, o peso no edital e os tópicos compartilhados."
             }}
             Para 31–59 dias, o guia não define uma rota própria: ajuste o ritmo
             sem eliminar as revisões.
@@ -1288,21 +1420,86 @@ const modalTitles: Record<string, string> = {
       ><DialogPortal
         ><DialogOverlay class="dialog-overlay" /><DialogContent
           class="dialog-content"
-          ><DialogTitle class="dialog-title">{{
-            modalTitles[modal]
-          }}</DialogTitle
-          ><DialogDescription class="micro"
-            >Salvo no seu espaço de estudo. Cada registro ajuda a orientar o
-            próximo passo.</DialogDescription
-          ><DialogClose class="dialog-close" aria-label="Fechar"
+          ><DialogTitle class="dialog-title">{{ modalTitle }}</DialogTitle
+          ><DialogDescription v-if="modalDescription" class="micro">{{
+            modalDescription
+          }}</DialogDescription
+          ><DialogClose class="dialog-close" aria-label="Fechar janela"
             ><X :size="20"
           /></DialogClose>
-          <form @submit.prevent="save">
+          <div v-if="modal === 'topicsList'" class="topic-manager">
+            <div v-if="!activeSubject?.topics.length" class="empty compact">
+              <ListTree :size="30" />
+              <h3>Nenhum tópico cadastrado.</h3>
+              <p>Adicione os conteúdos na ordem em que pretende estudá-los.</p>
+            </div>
+            <ol v-else class="topic-manager-list">
+              <li
+                v-for="(topic, index) in activeSubject?.topics"
+                :key="topic.id"
+                :data-topic-id="topic.id"
+                :class="{
+                  dragging: draggedTopicId === topic.id,
+                  'drag-over': dragOverTopicId === topic.id,
+                }"
+                @dragover.prevent="dragOverTopicId = topic.id"
+                @drop.prevent="dropTopic($event, topic.id)"
+              >
+                <span class="topic-position">{{ index + 1 }}</span>
+                <button
+                  type="button"
+                  class="topic-drag-handle"
+                  draggable="true"
+                  :aria-label="`Reposicionar ${topic.name}`"
+                  @dragstart="beginTopicDrag($event, topic.id)"
+                  @dragend="
+                    draggedTopicId = '';
+                    dragOverTopicId = '';
+                  "
+                  @pointerdown="beginPointerTopicDrag($event, topic.id)"
+                  @pointermove="trackPointerTopicDrag"
+                  @pointerup="finishPointerTopicDrag"
+                  @pointercancel="
+                    draggedTopicId = '';
+                    dragOverTopicId = '';
+                  "
+                >
+                  <GripVertical :size="17" />
+                </button>
+                <button
+                  type="button"
+                  class="edit-name topic-manager-name"
+                  @click="editTopic(activeSubject!, topic)"
+                >
+                  {{ topic.name }}
+                </button>
+              </li>
+            </ol>
+            <p v-if="notice" role="alert" class="error-message">
+              {{ notice }}
+            </p>
+            <div class="topic-manager-footer">
+              <Button
+                type="button"
+                :disabled="pending"
+                @click="open('topic', subjectId)"
+                ><Plus :size="15" /> Adicionar tópicos</Button
+              >
+              <Button type="button" variant="outline" @click="modal = ''"
+                >Fechar</Button
+              >
+            </div>
+          </div>
+          <form v-else @submit.prevent="save">
             <label
               v-if="
-                !['subject', 'review', 'editSubject', 'editTopic'].includes(
-                  modal,
-                )
+                ![
+                  'subject',
+                  'topic',
+                  'review',
+                  'editSubject',
+                  'editTopic',
+                ].includes(modal)
               "
               >Matéria<select
                 v-model="subjectId"
@@ -1315,16 +1512,18 @@ const modalTitles: Record<string, string> = {
               </select></label
             ><label
               v-if="
-                [
-                  'subject',
-                  'topic',
-                  'error',
-                  'editSubject',
-                  'editTopic',
-                ].includes(modal)
+                ['subject', 'error', 'editSubject', 'editTopic'].includes(modal)
               "
               >{{ modal === "error" ? "Assunto da questão" : "Nome"
               }}<input v-model="name" required maxlength="200" /></label
+            ><label v-if="modal === 'topic'"
+              >Tópicos <small>um por linha</small
+              ><textarea
+                v-model="name"
+                required
+                rows="6"
+                placeholder="Ex.: Atos administrativos&#10;Poderes administrativos&#10;Licitações"
+              /></label
             ><label v-if="modal === 'editSubject'"
               >Link do material principal<input
                 v-model="source"

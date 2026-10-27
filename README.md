@@ -85,3 +85,7 @@ Aplicação **pessoal e local**, com um espaço de estudo por instalação e sem
 O PDF fornecido é um guia metodológico: não inclui os 16 volumes, questões completas ou julgados. Por isso, materiais são vinculados por URL, questões/simulados são feitos no material de origem e seus resultados são registrados aqui. Não há banco de questões inventado, importação automática de edital, atualização jurídica automática nem notificações externas. A fila de revisões é calculada ao abrir o app.
 
 O banco é inteiramente relacional e não armazena documentos JSON/JSONB. O JSON da API é montado por consultas às tabelas. A migração preserva os dados da versão anterior e remove a coluna `workspaces.data`. Execute `pnpm db:migrate` antes de iniciar; o Docker faz isso automaticamente. Veja [a arquitetura do banco](docs/banco-relacional.md). A interface continua pessoal, com um plano por espaço e sem autenticação. Históricos extensos ainda são retornados pelo endpoint de compatibilidade; paginação e autenticação são evoluções independentes.
+
+### Vários concursos
+
+Acesse **Meus concursos** para cadastrar provas e relacionar seus editais ao acervo compartilhado. O Meu dia prioriza a prova mais próxima, considera pesos por edital e explica o aproveitamento entre concursos. Consulte [o guia de concursos](docs/concursos.md) para as regras e [a estrutura relacional](docs/banco-relacional.md) para a migração.

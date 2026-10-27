@@ -8,6 +8,7 @@ const router = createRouter({
   routes: [
     "/",
     "/plano",
+    "/concursos",
     "/materias",
     "/revisoes",
     "/erros",

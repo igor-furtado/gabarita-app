@@ -11,7 +11,7 @@ import {
 } from "./repository.js";
 
 const migrationId = "0001_relational";
-export async function migrateDatabase(db: Database) {
+async function migrateInitialDatabase(db: Database) {
   const ddl = await readFile(
     new URL("../migrations/0001_relational.sql", import.meta.url),
     "utf8",
@@ -64,7 +64,7 @@ export async function migrateDatabase(db: Database) {
     for (const row of records) {
       const data = legacySchema.parse(row.data);
       await importLegacyWorkspace(tx, row.id, row.version, data);
-      const reconstructed = await readWorkspace(tx, row.id);
+      const reconstructed = await readWorkspace(tx, row.id, false);
       // Compare every field, not just row counts. Unsupported/inconsistent legacy data aborts migration.
       if (
         !isDeepStrictEqual(reconstructed, {
@@ -96,4 +96,40 @@ export async function migrateDatabase(db: Database) {
     );
     return { applied: true, migratedWorkspaces: records.length };
   });
+}
+
+export async function migrateDatabase(db: Database) {
+  const initial = await migrateInitialDatabase(db);
+  let applied = initial.applied;
+  for (const id of ["0002_contests", "0003_contest_details"]) {
+    const ddl = await readFile(
+      new URL(`../migrations/${id}.sql`, import.meta.url),
+      "utf8",
+    ).catch(() =>
+      readFile(new URL(`../../migrations/${id}.sql`, import.meta.url), "utf8"),
+    );
+    const checksum = createHash("sha256").update(ddl).digest("hex");
+    const migrationApplied = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(current_schema() || ':gabarita:migrations'))`,
+      );
+      const rows = await tx.execute<{ checksum: string }>(
+        sql`select checksum from schema_migrations where id=${id}`,
+      );
+      if (rows[0]) {
+        if (rows[0].checksum !== checksum)
+          throw new Error(
+            "Migration checksum mismatch. Do not edit applied migrations.",
+          );
+        return false;
+      }
+      await tx.execute(sql.raw(ddl));
+      await tx.execute(
+        sql`insert into schema_migrations(id,checksum) values(${id},${checksum})`,
+      );
+      return true;
+    });
+    applied ||= migrationApplied;
+  }
+  return { ...initial, applied };
 }
