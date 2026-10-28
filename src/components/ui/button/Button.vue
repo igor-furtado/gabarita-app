@@ -6,7 +6,7 @@ import type { HTMLAttributes } from "vue";
 withDefaults(
   defineProps<
     PrimitiveProps & {
-      variant?: "default" | "outline" | "ghost";
+      variant?: "default" | "outline" | "ghost" | "danger";
       class?: HTMLAttributes["class"];
     }
   >(),
@@ -18,6 +18,7 @@ const variants = cva("button", {
       default: "button-primary",
       outline: "button-outline",
       ghost: "button-ghost",
+      danger: "button-danger",
     },
   },
 });

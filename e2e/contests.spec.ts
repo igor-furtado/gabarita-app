@@ -29,8 +29,9 @@ test("dois editais compartilham progresso e edição persiste no desktop e celul
     expect(response.ok()).toBe(true);
     return (await response.json()).data as State;
   };
-  let state = await send({ type: "subject", name: prefix, weight: 3 });
+  let state = await send({ type: "subject", name: prefix });
   const subject = state.subjects.find((s) => s.name === prefix)!;
+  await send({ type: "domain", id: subject.id, domain: 0 });
   state = await send({
     type: "topic",
     subjectId: subject.id,
@@ -59,6 +60,20 @@ test("dois editais compartilham progresso e edição persiste no desktop e celul
       .fill(addDays(today(), 30 + index * 90));
     await page.getByLabel("Buscar no acervo").fill(prefix);
     await page.getByRole("checkbox", { name: prefix }).check();
+    await expect(page.getByLabel("Peso no edital")).toHaveValue("1");
+    await page.getByLabel("Peso no edital").fill("10");
+    const controlHeights = await page
+      .locator(".contest-scope")
+      .evaluate((scope) => ({
+        weight: scope.querySelector("input")?.getBoundingClientRect().height,
+        coverage: scope.querySelector("select")?.getBoundingClientRect().height,
+      }));
+    expect(controlHeights.weight).toBe(controlHeights.coverage);
+    await expect(
+      page.getByText(
+        "Inclui os tópicos atuais e os que você adicionar a esta matéria depois.",
+      ),
+    ).toHaveCount(0);
     await page
       .getByLabel("Abrangência")
       .selectOption({ label: "Selecionar tópicos" });
@@ -89,7 +104,7 @@ test("dois editais compartilham progresso e edição persiste no desktop e celul
     const card = page
       .locator(".contest-card")
       .filter({ has: page.getByRole("heading", { name, exact: true }) });
-    await expect(card).toContainText("1 lidos · 0 dominados de 1 tópicos");
+    await expect(card).toContainText("1 de 1 tópicos lidos");
   }
   const detailed = page
     .locator(".contest-card")

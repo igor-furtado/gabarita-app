@@ -10,7 +10,13 @@ import {
 function fixture() {
   const s = initialState();
   s.subjects[0]!.topics = [
-    { id: "topic", name: "Atos administrativos", read: false, mastered: false },
+    {
+      id: "topic",
+      name: "Atos administrativos",
+      read: false,
+      mastered: false,
+      kind: "regular",
+    },
   ];
   return s;
 }
@@ -26,18 +32,18 @@ describe("Validações do método", () => {
     correct: 17,
     kind: "active" as const,
   };
-  it("bloqueia ciclo ativo antes de concluir a leitura", () =>
-    expect(() => validateSession(session, false)).toThrow("primeira leitura"));
-  it("exige cinco linhas", () =>
+  it("orienta sem bloquear ciclo ativo fora da ordem", () =>
+    expect(() => validateSession(session)).not.toThrow());
+  it("aceita registro com menos de cinco linhas", () =>
     expect(() =>
-      validateSession({ ...session, recall: "Só uma linha" }, true),
-    ).toThrow("cinco linhas"));
+      validateSession({ ...session, recall: "Só uma linha" }),
+    ).not.toThrow());
   it("rejeita mais acertos que questões", () =>
-    expect(() => validateSession({ ...session, correct: 21 }, true)).toThrow(
+    expect(() => validateSession({ ...session, correct: 21 })).toThrow(
       "Acertos",
     ));
-  it("exige vinte questões na revisão de 30 dias", () =>
-    expect(() => validateReview(30, 19, 19)).toThrow("20 questões"));
+  it("orienta sem bloquear revisão de 30 dias com menos questões", () =>
+    expect(() => validateReview(30, 19, 19)).not.toThrow());
   it("aceita revisão curta sem questões", () =>
     expect(() => validateReview(1, 0, 0)).not.toThrow());
   it("prioriza rota curta até 30 dias", () => {
@@ -81,14 +87,17 @@ it("sem prova marcada não força a reta final por tempo decorrido", () => {
   s.profile.startDate = "2025-01-01";
   expect(phase(s, "2026-10-20")).toBe("Fundação");
 });
-it("intercala a próxima matéria quando há alternativas", () => {
+it("mantém a matéria principal até concluir o volume", () => {
   const s = fixture();
+  s.subjects[0]!.domain = 0;
+  s.subjects[1]!.domain = 4;
   s.subjects[1]!.topics = [
     {
       id: "other",
       name: "Direitos fundamentais",
       read: false,
       mastered: false,
+      kind: "regular",
     },
   ];
   s.sessions = [
@@ -105,5 +114,5 @@ it("intercala a próxima matéria quando há alternativas", () => {
     },
   ];
   const result = recommendation(s, "2026-10-20");
-  expect("subject" in result && result.subject?.id).toBe(s.subjects[1]!.id);
+  expect("subject" in result && result.subject?.id).toBe(s.subjects[0]!.id);
 });

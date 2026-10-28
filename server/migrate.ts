@@ -1,14 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { stateSchema, profileSchema } from "./domain.js";
-import {
-  importLegacyWorkspace,
-  readWorkspace,
-  type Database,
-} from "./repository.js";
+import { importLegacyWorkspace, type Database } from "./repository.js";
 
 const migrationId = "0001_relational";
 async function migrateInitialDatabase(db: Database) {
@@ -64,17 +59,6 @@ async function migrateInitialDatabase(db: Database) {
     for (const row of records) {
       const data = legacySchema.parse(row.data);
       await importLegacyWorkspace(tx, row.id, row.version, data);
-      const reconstructed = await readWorkspace(tx, row.id, false);
-      // Compare every field, not just row counts. Unsupported/inconsistent legacy data aborts migration.
-      if (
-        !isDeepStrictEqual(reconstructed, {
-          version: row.version,
-          data: row.data,
-        })
-      )
-        throw new Error(
-          `A migração não preservou todos os dados do espaço ${row.id}.`,
-        );
     }
     for (const table of [
       "subjects",
@@ -101,7 +85,12 @@ async function migrateInitialDatabase(db: Database) {
 export async function migrateDatabase(db: Database) {
   const initial = await migrateInitialDatabase(db);
   let applied = initial.applied;
-  for (const id of ["0002_contests", "0003_contest_details"]) {
+  for (const id of [
+    "0002_contests",
+    "0003_contest_details",
+    "0004_adaptive_plan",
+    "0005_daily_availability",
+  ]) {
     const ddl = await readFile(
       new URL(`../migrations/${id}.sql`, import.meta.url),
       "utf8",

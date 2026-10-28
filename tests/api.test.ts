@@ -51,16 +51,76 @@ afterAll(async () => {
   await sandbox?.close();
 });
 describe("API relacional com PostgreSQL", () => {
+  it("cria a Revisão de Véspera protegida e persiste domínio opcional", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/commands",
+      payload: {
+        version: (await current()).version,
+        command: { type: "subject", name: "Matéria com domínio" },
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    let subject = created
+      .json<{ data: State }>()
+      .data.subjects.find((item) => item.name === "Matéria com domínio")!;
+    expect(subject).toMatchObject({ domain: null });
+    expect(subject.topics).toEqual([
+      expect.objectContaining({
+        name: "Revisão de Véspera",
+        kind: "eve_review",
+        read: false,
+      }),
+    ]);
+
+    const domain = await app.inject({
+      method: "POST",
+      url: "/api/commands",
+      payload: {
+        version: (await current()).version,
+        command: { type: "domain", id: subject.id, domain: 0 },
+      },
+    });
+    expect(domain.statusCode).toBe(200);
+    subject = domain
+      .json<{ data: State }>()
+      .data.subjects.find((item) => item.id === subject.id)!;
+    expect(subject).toMatchObject({ domain: 0 });
+
+    const special = subject.topics[0]!;
+    expect(
+      (
+        await send({
+          type: "editTopic",
+          subjectId: subject.id,
+          id: special.id,
+          name: "Outro nome",
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await send({
+          type: "deleteTopic",
+          subjectId: subject.id,
+          id: special.id,
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
   it("inicializa sem documentos e persiste em tabelas", async () => {
     const initial = await current();
-    expect(initial.data.subjects).toHaveLength(16);
+    expect(
+      initial.data.subjects.filter((subject) =>
+        initialState().subjects.some((seed) => seed.name === subject.name),
+      ),
+    ).toHaveLength(16);
     const columns =
       await sandbox.client`select table_name,column_name from information_schema.columns where table_schema=${sandbox.schema} and data_type in ('json','jsonb','ARRAY')`;
     expect(columns).toHaveLength(0);
     const result = await send({
       type: "subject",
       name: "Matéria de integração",
-      weight: 5,
     });
     expect(result.statusCode).toBe(200);
     expect(
@@ -71,7 +131,7 @@ describe("API relacional com PostgreSQL", () => {
     const version = (await current()).version;
     const payload = {
       version,
-      command: { type: "subject", name: "Concorrente", weight: 1 },
+      command: { type: "subject", name: "Concorrente" },
     };
     const responses = await Promise.all([
       app.inject({ method: "POST", url: "/api/commands", payload }),
@@ -82,8 +142,24 @@ describe("API relacional com PostgreSQL", () => {
       await sandbox.client`select id from subjects where name='Concorrente'`,
     ).toHaveLength(1);
   });
-  it("não deixa registros parciais ao rejeitar sessão", async () => {
-    const pair = await subjectAndTopic();
+  it("registra ciclo ativo fora da ordem sem marcar primeira leitura", async () => {
+    const name = "Fora da ordem " + crypto.randomUUID();
+    const created = await send({ type: "subject", name });
+    const subject = created
+      .json<{ data: State }>()
+      .data.subjects.find((item) => item.name === name)!;
+    const withTopic = await send({
+      type: "topic",
+      subjectId: subject.id,
+      name: "Tópico ainda não lido",
+    });
+    const pair = {
+      subjectId: subject.id,
+      topicId: withTopic
+        .json<{ data: State }>()
+        .data.subjects.find((item) => item.id === subject.id)!
+        .topics.find((item) => item.kind === "regular")!.id,
+    };
     const before = await current();
     const response = await send({
       type: "session",
@@ -98,12 +174,22 @@ describe("API relacional com PostgreSQL", () => {
         kind: "active",
       },
     });
-    expect(response.statusCode).toBe(400);
-    expect(await current()).toEqual(before);
+    expect(response.statusCode).toBe(200);
+    const after = await current();
+    expect(after.data.sessions).toHaveLength(before.data.sessions.length + 1);
+    const topic = after.data.subjects
+      .flatMap((subject) => subject.topics)
+      .find((item) => item.id === pair.topicId)!;
+    expect(topic.read).toBe(false);
+    expect(
+      (await send({ type: "deleteSubject", id: subject.id })).statusCode,
+    ).toBe(200);
   });
   it("leitura e ciclo ativo agendam revisões sem duplicar sessão", async () => {
     const state = await current();
-    for (const topic of state.data.subjects[0]!.topics) {
+    for (const topic of state.data.subjects[0]!.topics.filter(
+      (item) => item.kind === "regular",
+    )) {
       const result = await send({
         type: "session",
         session: {
@@ -142,26 +228,44 @@ describe("API relacional com PostgreSQL", () => {
       [1, 7, 30].map((n) => addDays(today(), n)),
     );
   });
-  it("80% reagenda; mais de 80% marca domínio na nova revisão", async () => {
+  it("simulado não conclui a primeira leitura do tópico associado", async () => {
+    const pair = await subjectAndTopic();
+    const response = await send({
+      type: "session",
+      session: {
+        ...pair,
+        id: crypto.randomUUID(),
+        date: today(),
+        minutes: 120,
+        recall: "",
+        questions: 100,
+        correct: 70,
+        kind: "mock",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    const topic = (await current()).data.subjects
+      .flatMap((subject) => subject.topics)
+      .find((item) => item.id === pair.topicId)!;
+    expect(topic.read).toBe(false);
+  });
+  it("resultado de revisão não altera domínio nem cria regra de 80%", async () => {
     const review = (await current()).data.reviews.find(
       (r) => r.interval === 30 && !r.done,
     )!;
-    const first = await send({
+    const result = await send({
       type: "review",
       id: review.id,
       questions: 20,
       correct: 16,
     });
-    expect(first.statusCode).toBe(200);
+    expect(result.statusCode).toBe(200);
     const state = (await current()).data;
-    const next = state.reviews.find((r) => r.interval === 30 && !r.done)!;
-    expect(next.due).toBe(addDays(today(), 7));
-    expect(state.subjects[0]!.topics[0]!.mastered).toBe(false);
     expect(
-      (await send({ type: "review", id: next.id, questions: 20, correct: 17 }))
-        .statusCode,
-    ).toBe(200);
-    expect((await current()).data.subjects[0]!.topics[0]!.mastered).toBe(true);
+      state.reviews.filter((r) => r.interval === 30 && !r.done),
+    ).toHaveLength(0);
+    expect(state.subjects[0]!.topics[0]!.mastered).toBe(false);
+    expect(state.sessions.at(-1)!.kind).toBe("active");
   });
   it("normaliza causas e calcula prioridade dos lembretes", async () => {
     const sub = (await current()).data.subjects[0]!;
@@ -222,7 +326,7 @@ describe("API relacional com PostgreSQL", () => {
     const state = (await current()).data;
     const sub = state.subjects[0]!;
     expect(
-      (await send({ type: "weight", id: sub.id, weight: 7 })).statusCode,
+      (await send({ type: "domain", id: sub.id, domain: 4 })).statusCode,
     ).toBe(200);
     expect(
       (
@@ -238,7 +342,7 @@ describe("API relacional com PostgreSQL", () => {
       (
         await send({
           type: "editTopic",
-          id: sub.topics[0]!.id,
+          id: sub.topics.find((topic) => topic.kind === "regular")!.id,
           subjectId: sub.id,
           name: "Novo tópico",
         })
@@ -251,6 +355,72 @@ describe("API relacional com PostgreSQL", () => {
     expect(after.subjects[0]!.name).toBe("Novo nome");
     expect(after.profile.hours).toBe(12);
     expect(after.errors[0]!.resolved).toBe(true);
+  });
+  it("exclui a matéria e seus dados relacionados", async () => {
+    const created = await send({
+      type: "subject",
+      name: "Matéria descartável",
+    });
+    expect(created.statusCode).toBe(200);
+    const subject = (await current()).data.subjects.find(
+      (item) => item.name === "Matéria descartável",
+    )!;
+    expect(
+      (
+        await send({
+          type: "topic",
+          subjectId: subject.id,
+          name: "Tópico descartável",
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await send({ type: "deleteSubject", id: subject.id })).statusCode,
+    ).toBe(200);
+    expect(
+      (await current()).data.subjects.some((item) => item.id === subject.id),
+    ).toBe(false);
+    expect(
+      await sandbox.client`select id from topics where subject_id=${subject.id}`,
+    ).toHaveLength(0);
+  });
+  it("exclui um tópico e normaliza a ordem dos restantes", async () => {
+    const subject = (await current()).data.subjects[0]!;
+    expect(
+      (
+        await send({
+          type: "topics",
+          subjectId: subject.id,
+          names: ["Excluir este", "Manter este"],
+        })
+      ).statusCode,
+    ).toBe(200);
+    const updated = (await current()).data.subjects[0]!;
+    const removed = updated.topics.find(
+      (topic) => topic.name === "Excluir este",
+    )!;
+    expect(
+      (
+        await send({
+          type: "deleteTopic",
+          subjectId: subject.id,
+          id: removed.id,
+        })
+      ).statusCode,
+    ).toBe(200);
+    const remaining = await sandbox.client`
+      select position from topics
+      where subject_id=${subject.id}
+      order by position
+    `;
+    expect(remaining.map((topic) => topic.position)).toEqual(
+      remaining.map((_, position) => position),
+    );
+    expect(
+      (await current()).data.subjects[0]!.topics.some(
+        (topic) => topic.id === removed.id,
+      ),
+    ).toBe(false);
   });
   it("impede acesso cruzado entre espaços e relações inconsistentes", async () => {
     await initializeWorkspace(sandbox.db, 2);
@@ -270,7 +440,7 @@ describe("API relacional com PostgreSQL", () => {
     ).data.subjects[0]!;
     const before = await current();
     expect(
-      (await send({ type: "weight", id: other.id, weight: 5 })).statusCode,
+      (await send({ type: "domain", id: other.id, domain: 5 })).statusCode,
     ).toBe(400);
     const own = before.data.subjects[0]!;
     expect(
@@ -305,7 +475,7 @@ describe("API relacional com PostgreSQL", () => {
       url: "/api/commands",
       payload: {
         version: before.version,
-        command: { type: "subject", name: "", weight: -1 },
+        command: { type: "subject", name: "" },
       },
     });
     expect(response.statusCode).toBe(400);

@@ -38,6 +38,8 @@ const subjects = computed(() =>
     s.name.toLocaleLowerCase().includes(filter.value.toLocaleLowerCase()),
   ),
 );
+const regularTopics = (subject: State["subjects"][number]) =>
+  subject.topics.filter((topic) => topic.kind === "regular");
 function copyContest(c: Contest): Contest {
   return {
     ...c,
@@ -69,14 +71,14 @@ function link(id: string) {
 }
 function toggleSubject(id: string, selected: boolean) {
   if (!draft.value) return;
-  if (selected)
+  if (selected) {
     draft.value.subjects.push({
       subjectId: id,
-      weight: 3,
+      weight: 1,
       allTopics: true,
       topicIds: [],
     });
-  else
+  } else
     draft.value.subjects = draft.value.subjects.filter(
       (s) => s.subjectId !== id,
     );
@@ -125,8 +127,8 @@ async function archive(contest: Contest) {
   <div class="info-box">
     Cadastre as matérias uma única vez em
     <RouterLink to="/materias">Matérias e tópicos</RouterLink>. Aqui, escolha o
-    que cada edital cobra. Leituras, revisões e domínio dos tópicos são
-    compartilhados automaticamente.
+    que cada edital cobra. Leituras e revisões dos tópicos, além do domínio na
+    matéria, são compartilhados automaticamente.
   </div>
   <form
     v-if="draft"
@@ -242,7 +244,7 @@ async function archive(contest: Contest) {
               )
             "
           />{{ subject.name }}
-          <small>{{ subject.topics.length }} tópicos</small></label
+          <small>{{ regularTopics(subject).length }} tópicos</small></label
         >
         <div v-if="link(subject.id)" class="contest-scope">
           <label
@@ -263,17 +265,13 @@ async function archive(contest: Contest) {
               <option :value="false">Selecionar tópicos</option>
             </select></label
           >
-          <p v-if="link(subject.id)!.allTopics" class="micro scope-hint">
-            Inclui os tópicos atuais e os que você adicionar a esta matéria
-            depois.
-          </p>
-          <div v-else class="topic-selection">
-            <p v-if="!subject.topics.length" class="micro">
+          <div v-if="!link(subject.id)!.allTopics" class="topic-selection">
+            <p v-if="!regularTopics(subject).length" class="micro">
               Cadastre os tópicos dessa matéria no acervo antes de fazer uma
               seleção específica.
             </p>
             <label
-              v-for="topic in subject.topics"
+              v-for="topic in regularTopics(subject)"
               :key="topic.id"
               class="check-label"
               ><input
@@ -402,9 +400,8 @@ async function archive(contest: Contest) {
         :aria-label="`Leitura do edital ${contest.name}`"
       />
       <p class="micro">
-        {{ contestProgress(state, contest).read }} lidos ·
-        {{ contestProgress(state, contest).mastered }} dominados de
-        {{ contestProgress(state, contest).total }} tópicos
+        {{ contestProgress(state, contest).read }} de
+        {{ contestProgress(state, contest).total }} tópicos lidos
       </p>
       <p v-if="!contestProgress(state, contest).total" class="micro">
         Complete o edital com matérias e tópicos para começar.
@@ -484,9 +481,12 @@ async function archive(contest: Contest) {
   grid-template-columns: 100px 1fr;
   gap: 12px;
 }
-.scope-hint,
 .topic-selection {
   grid-column: 1/-1;
+}
+.contest-scope input,
+.contest-scope select {
+  height: 42px;
 }
 .topic-selection {
   display: grid;

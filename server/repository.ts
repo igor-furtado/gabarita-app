@@ -1,4 +1,3 @@
-import { relevantTopics } from "./planning.js";
 import { and, eq, sql, asc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
@@ -43,13 +42,23 @@ export async function initializeWorkspace(db: Database, workspaceId = 1) {
     await tx.insert(profiles).values({ workspaceId, name: "" });
     const [plan] = await tx
       .insert(studyPlans)
-      .values({ workspaceId, startDate: today() })
+      .values({ workspaceId, startDate: today(), dailyHours: 2 })
       .returning();
-    await tx.insert(subjects).values(
-      names.map((name, position) => ({
-        planId: plan!.id,
-        name,
-        weight: position < 5 ? 3 : 1,
+    const createdSubjects = await tx
+      .insert(subjects)
+      .values(
+        names.map((name, position) => ({
+          planId: plan!.id,
+          name,
+          position,
+        })),
+      )
+      .returning({ id: subjects.id });
+    await tx.insert(topics).values(
+      createdSubjects.map(({ id }) => ({
+        subjectId: id,
+        name: "Revisão de Véspera",
+        kind: "eve_review" as const,
       })),
     );
   });
@@ -118,7 +127,13 @@ export async function readWorkspace(
   const bySubject = new Map<string, State["subjects"][number]["topics"]>();
   for (const { row: t } of topicRows) {
     const list = bySubject.get(t.subjectId) ?? [];
-    list.push({ id: t.id, name: t.name, read: t.read, mastered: t.mastered });
+    list.push({
+      id: t.id,
+      name: t.name,
+      read: t.read,
+      mastered: t.mastered,
+      kind: t.kind,
+    });
     bySubject.set(t.subjectId, list);
   }
   const contestRows = includeContests
@@ -180,15 +195,18 @@ export async function readWorkspace(
         target: header.plan.target,
         examDate: header.plan.examDate ?? "",
         startDate: header.plan.startDate,
-        hours: header.plan.weeklyHours,
+        hours: header.plan.dailyHours,
         configured: header.plan.configured,
       },
       subjects: subjectRows.map((s) => ({
         id: s.id,
         name: s.name,
-        weight: s.weight,
+        domain: s.domain,
         ...(s.materialUrl !== null ? { materialUrl: s.materialUrl } : {}),
-        topics: bySubject.get(s.id) ?? [],
+        topics: [...(bySubject.get(s.id) ?? [])].sort(
+          (a, b) =>
+            Number(a.kind === "eve_review") - Number(b.kind === "eve_review"),
+        ),
       })),
       sessions: sessionRows.map(({ row: s, subjectId }) => ({
         id: s.id,
@@ -248,34 +266,41 @@ export async function importLegacyWorkspace(
 ) {
   await tx.insert(workspaces).values({ id, version });
   await tx.insert(profiles).values({ workspaceId: id, name: s.profile.name });
-  const [plan] = await tx
-    .insert(studyPlans)
-    .values({
-      workspaceId: id,
-      target: s.profile.target,
-      examDate: s.profile.examDate || null,
-      startDate: s.profile.startDate,
-      weeklyHours: s.profile.hours,
-      configured: s.profile.configured,
-    })
-    .returning();
+  const [plan] = await tx.execute<{ id: string }>(sql`
+    insert into study_plans(
+      workspace_id, target, exam_date, start_date, weekly_hours, configured
+    ) values (
+      ${id}, ${s.profile.target}, ${s.profile.examDate || null},
+      ${s.profile.startDate}, ${s.profile.hours}, ${s.profile.configured}
+    ) returning id
+  `);
   for (const [position, sub] of s.subjects.entries()) {
-    await tx.insert(subjects).values({
-      id: sub.id,
-      planId: plan!.id,
-      name: sub.name,
-      weight: sub.weight,
-      materialUrl: sub.materialUrl ?? null,
-      position,
-    });
+    await tx.execute(sql`
+      insert into subjects(id, plan_id, name, weight, material_url, position)
+      values (
+        ${sub.id},
+        ${plan!.id},
+        ${sub.name},
+        ${(sub as typeof sub & { weight?: number }).weight ?? 1},
+        ${sub.materialUrl ?? null},
+        ${position}
+      )
+    `);
     if (sub.topics.length)
-      await tx.insert(topics).values(
-        sub.topics.map((t, position) => ({
-          ...t,
-          subjectId: sub.id,
-          position,
-        })),
-      );
+      for (const [topicPosition, topic] of sub.topics.entries())
+        await tx.execute(sql`
+          insert into topics(
+            id, subject_id, name, is_read, is_mastered, position
+          )
+          values (
+            ${topic.id},
+            ${sub.id},
+            ${topic.name},
+            ${topic.read},
+            ${topic.mastered},
+            ${topicPosition}
+          )
+        `);
   }
   for (const [position, sess] of s.sessions.entries()) {
     const { subjectId, ...row } = sess;
@@ -435,23 +460,29 @@ export async function executeRelationalCommand(
             target: c.profile.target,
             examDate: c.profile.examDate || null,
             startDate: c.profile.startDate,
-            weeklyHours: c.profile.hours,
+            dailyHours: c.profile.hours,
             configured: c.profile.configured,
           })
           .where(eq(studyPlans.id, plan.id));
         break;
       }
       case "subject": {
-        await tx
+        const [subject] = await tx
           .insert(subjects)
-          .values({ planId: plan.id, name: c.name, weight: c.weight });
+          .values({ planId: plan.id, name: c.name })
+          .returning({ id: subjects.id });
+        await tx.insert(topics).values({
+          subjectId: subject!.id,
+          name: "Revisão de Véspera",
+          kind: "eve_review",
+        });
         break;
       }
-      case "weight":
+      case "domain":
         await getSubject(c.id);
         await tx
           .update(subjects)
-          .set({ weight: c.weight })
+          .set({ domain: c.domain })
           .where(eq(subjects.id, c.id));
         break;
       case "editSubject":
@@ -461,8 +492,14 @@ export async function executeRelationalCommand(
           .set({ name: c.name, materialUrl: c.materialUrl })
           .where(eq(subjects.id, c.id));
         break;
+      case "deleteSubject":
+        await getSubject(c.id);
+        await tx.delete(subjects).where(eq(subjects.id, c.id));
+        break;
       case "topic": {
         await getSubject(c.subjectId);
+        if (c.name.trim().toLocaleLowerCase() === "revisão de véspera")
+          throw new DomainError("A Revisão de Véspera já existe na matéria.");
         await tx
           .insert(topics)
           .values({ subjectId: c.subjectId, name: c.name });
@@ -470,6 +507,12 @@ export async function executeRelationalCommand(
       }
       case "topics": {
         await getSubject(c.subjectId);
+        if (
+          c.names.some(
+            (name) => name.trim().toLocaleLowerCase() === "revisão de véspera",
+          )
+        )
+          throw new DomainError("A Revisão de Véspera já existe na matéria.");
         await tx
           .insert(topics)
           .values(c.names.map((name) => ({ subjectId: c.subjectId, name })));
@@ -495,13 +538,35 @@ export async function executeRelationalCommand(
             .where(and(eq(topics.id, id), eq(topics.subjectId, c.subjectId)));
         break;
       }
-      case "editTopic":
-        await getTopic(c.id, c.subjectId);
+      case "editTopic": {
+        const topic = await getTopic(c.id, c.subjectId);
+        if (topic.kind === "eve_review")
+          throw new DomainError("A Revisão de Véspera não pode ser editada.");
         await tx
           .update(topics)
           .set({ name: c.name })
           .where(eq(topics.id, c.id));
         break;
+      }
+      case "deleteTopic": {
+        const topic = await getTopic(c.id, c.subjectId);
+        if (topic.kind === "eve_review")
+          throw new DomainError("A Revisão de Véspera não pode ser excluída.");
+        await tx
+          .delete(topics)
+          .where(and(eq(topics.id, c.id), eq(topics.subjectId, c.subjectId)));
+        const remaining = await tx
+          .select({ id: topics.id })
+          .from(topics)
+          .where(eq(topics.subjectId, c.subjectId))
+          .orderBy(asc(topics.position), asc(topics.id));
+        for (const [position, topic] of remaining.entries())
+          await tx
+            .update(topics)
+            .set({ position })
+            .where(eq(topics.id, topic.id));
+        break;
+      }
       case "session": {
         const session = c.session;
         await getTopic(session.topicId, session.subjectId);
@@ -514,32 +579,15 @@ export async function executeRelationalCommand(
             throw new DomainError("Identificador de sessão já utilizado.");
           break;
         }
-        const unread = await tx
-          .select({ id: topics.id })
-          .from(topics)
-          .where(
-            and(
-              eq(topics.subjectId, session.subjectId),
-              eq(topics.read, false),
-            ),
-          )
-          .limit(1);
-        const snapshot = (await readWorkspace(tx, workspaceId)).data;
-        const scope = relevantTopics(snapshot, session.subjectId, today());
-        validateSession(
-          session,
-          snapshot.contests?.length &&
-            scope.some((t) => t.id === session.topicId)
-            ? scope.every((t) => t.read)
-            : unread.length === 0,
-        );
+        validateSession(session);
         const { subjectId: ignoredSubjectId, ...row } = session;
         void ignoredSubjectId;
         await tx.insert(studySessions).values({ ...row, date: today() });
-        await tx
-          .update(topics)
-          .set({ read: true })
-          .where(eq(topics.id, session.topicId));
+        if (session.kind === "reading")
+          await tx
+            .update(topics)
+            .set({ read: true })
+            .where(eq(topics.id, session.topicId));
         if (session.kind === "active") {
           const pending = await tx
             .select({ interval: reviews.interval })
@@ -575,19 +623,6 @@ export async function executeRelationalCommand(
           .update(reviews)
           .set({ done: true })
           .where(eq(reviews.id, c.id));
-        if (entry.review.interval === 30) {
-          const mastered = c.correct / c.questions > 0.8;
-          await tx
-            .update(topics)
-            .set({ mastered })
-            .where(eq(topics.id, entry.review.topicId));
-          if (!mastered)
-            await tx.insert(reviews).values({
-              topicId: entry.review.topicId,
-              interval: 30,
-              due: addDays(today(), 7),
-            });
-        }
         if (c.questions)
           await tx.insert(studySessions).values({
             topicId: entry.review.topicId,
@@ -596,7 +631,7 @@ export async function executeRelationalCommand(
             recall: "Revisão concluída",
             questions: c.questions,
             correct: c.correct,
-            kind: "mock",
+            kind: "active",
           });
         break;
       }

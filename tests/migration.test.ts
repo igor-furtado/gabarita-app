@@ -23,12 +23,14 @@ function legacy() {
       name: "Primeiro tópico",
       read: true,
       mastered: false,
+      kind: "regular",
     },
     {
       id: crypto.randomUUID(),
       name: "Segundo tópico",
       read: false,
       mastered: false,
+      kind: "regular",
     },
   ];
   const topic = sub.topics[0]!;
@@ -106,20 +108,50 @@ it("migra todos os campos, UUIDs, datas, versões e ordem; remove o documento", 
       subjects: first.subjects
         .map((s) => ({
           subjectId: s.id,
-          weight: s.weight,
+          weight: 1,
           allTopics: true,
           topicIds: [],
         }))
         .sort((a, b) => a.subjectId.localeCompare(b.subjectId)),
     });
-    expect(await readWorkspace(box.db, 1, false)).toEqual({
+    const withoutEveReview = (state: ReturnType<typeof initialState>) => ({
+      ...state,
+      subjects: state.subjects.map((subject) => ({
+        ...subject,
+        topics: subject.topics.filter((topic) => topic.kind === "regular"),
+      })),
+    });
+    const migratedFirst = await readWorkspace(box.db, 1, false);
+    const migratedSecond = await readWorkspace(box.db, 2, false);
+    const dailyFirst = {
+      ...first,
+      profile: { ...first.profile, hours: 2, configured: false },
+    };
+    const dailySecond = {
+      ...second,
+      profile: { ...second.profile, hours: 2, configured: false },
+    };
+    expect({
+      ...migratedFirst,
+      data: withoutEveReview(migratedFirst.data),
+    }).toEqual({
       version: 42,
-      data: first,
+      data: withoutEveReview(dailyFirst),
     });
-    expect(await readWorkspace(box.db, 2, false)).toEqual({
+    expect({
+      ...migratedSecond,
+      data: withoutEveReview(migratedSecond.data),
+    }).toEqual({
       version: 7,
-      data: second,
+      data: withoutEveReview(dailySecond),
     });
+    expect(
+      migratedFirst.data.subjects.every(
+        (subject) =>
+          subject.topics.filter((topic) => topic.kind === "eve_review")
+            .length === 1,
+      ),
+    ).toBe(true);
     const columns =
       await box.client`select column_name from information_schema.columns where table_schema=${box.schema} and data_type in ('json','jsonb','ARRAY')`;
     expect(columns).toHaveLength(0);
@@ -130,7 +162,6 @@ it("migra todos os campos, UUIDs, datas, versões e ordem; remove o documento", 
     const result = await executeRelationalCommand(box.db, 42, {
       type: "subject",
       name: "Acrescentada depois",
-      weight: 1,
     });
     expect(result.data.subjects.at(-1)!.name).toBe("Acrescentada depois");
   } finally {

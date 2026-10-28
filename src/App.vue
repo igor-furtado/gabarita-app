@@ -29,6 +29,7 @@ import {
   ArrowUpDown,
   ListTree,
   GripVertical,
+  Trash2,
 } from "lucide-vue-next";
 import {
   DialogRoot,
@@ -46,11 +47,16 @@ import {
   type ColumnDef,
 } from "@tanstack/vue-table";
 import ContestsPage from "./features/contests/ContestsPage.vue";
-import { activeContests } from "../server/planning";
+import {
+  activeContests,
+  planOutline,
+  planReadiness,
+  rankedSubjects,
+  studyWeek,
+} from "../server/planning";
 import Button from "./components/ui/button/Button.vue";
 import { useGetState, executeCommand } from "./api/generated";
 import {
-  phase,
   today,
   addDays,
   recommendation,
@@ -61,8 +67,12 @@ import type { z } from "zod";
 const route = useRoute(),
   router = useRouter(),
   queryClient = useQueryClient();
+const confirmSubjectDeletion = ref(false);
+const confirmTopicDeletion = ref(false);
 const query = useGetState();
 const state = computed(() => query.data.value?.data as State | undefined);
+const regularTopics = (subject: State["subjects"][number]) =>
+  subject.topics.filter((topic) => topic.kind === "regular");
 const nav = [
   { path: "/", label: "Meu dia", icon: LayoutDashboard },
   { path: "/concursos", label: "Meus concursos", icon: Target },
@@ -79,41 +89,87 @@ const title = computed(
 const focusContest = computed(() =>
   state.value ? activeContests(state.value, today())[0] : undefined,
 );
-const currentPhase = computed(() =>
-  state.value ? phase(state.value) : "Fundação",
-);
-const week = computed(() =>
+const readiness = computed(() =>
   state.value
-    ? Math.max(
-        1,
-        Math.min(
-          13,
-          Math.floor(
-            (Date.parse(today()) - Date.parse(state.value.profile.startDate)) /
-              604800000,
-          ) + 1,
-        ),
-      )
-    : 1,
+    ? planReadiness(state.value, today())
+    : {
+        ready: false,
+        needsProfile: true,
+        needsContest: true,
+        missingDomains: [],
+      },
 );
+const outline = computed(() =>
+  state.value
+    ? planOutline(state.value, today())
+    : { scenario: "undated" as const, daysRemaining: null, phases: [] },
+);
+const weeklySchedule = computed(() =>
+  state.value && readiness.value.ready ? studyWeek(state.value, today()) : [],
+);
+const scenarioLabels = {
+  urgent: "Plano urgente",
+  short: "Plano de curto prazo",
+  standard: "Plano padrão",
+  long: "Plano de longo prazo",
+  undated: "Plano sem data de prova",
+};
+const phaseLabels = {
+  base: "Construção de base",
+  foundation: "Primeira leitura",
+  consolidation: "Consolidação",
+  final: "Reta final",
+  eve_review: "Revisões de Véspera",
+  legislation: "Alterações Legislativas",
+  judgments: "Julgados",
+  mock: "Simulado",
+};
+const phaseDescriptions = {
+  base: "Concluir matérias prioritárias e reduzir lacunas de domínio.",
+  foundation: "Ler cada volume inteiro, começando pelas matérias prioritárias.",
+  consolidation:
+    "Reforçar o conteúdo já percorrido e avançar nas matérias restantes.",
+  final: "Revisões de Véspera, conteúdos especiais e simulado.",
+  eve_review: "Percorrer o tópico fixo de cada matéria na ordem de prioridade.",
+  legislation:
+    "Estudar as alterações legislativas pertinentes aos editais ativos.",
+  judgments: "Estudar os julgados pertinentes aos editais ativos.",
+  mock: "Resolver uma prova completa e corrigir os erros.",
+};
+const domainOptions = [
+  { value: 0, label: "Ainda não conheço a matéria" },
+  { value: 1, label: "Reconheço o assunto, mas ainda não estudei" },
+  { value: 2, label: "Tenho familiaridade inicial" },
+  { value: 3, label: "Conheço os fundamentos" },
+  { value: 4, label: "Consigo responder questões" },
+  { value: 5, label: "Consigo explicar o conteúdo" },
+];
 const due = computed(
   () => state.value?.reviews.filter((r) => !r.done && r.due <= today()) ?? [],
 );
 const ranked = computed(() =>
-  [...(state.value?.subjects ?? [])].sort((a, b) => b.weight - a.weight),
+  state.value
+    ? rankedSubjects(state.value, today()).map(({ subject }) => subject)
+    : [],
 );
 const limit = computed(() =>
   !state.value
     ? 16
-    : state.value.profile.hours < 10
+    : state.value.profile.hours * 6 < 10
       ? 6
-      : state.value.profile.hours < 14
+      : state.value.profile.hours * 6 < 14
         ? 10
-        : 16,
+        : state.value.subjects.length,
 );
 const suggested = computed(() =>
   state.value
-    ? recommendation(state.value)
+    ? readiness.value.ready
+      ? recommendation(state.value)
+      : {
+          kind: "organize" as const,
+          reason:
+            "Complete seu planejamento, vincule um edital e informe o domínio das matérias.",
+        }
     : {
         kind: "organize" as const,
         reason: "Cadastre seus concursos para começar.",
@@ -121,11 +177,11 @@ const suggested = computed(() =>
 );
 const nextTopic = computed(
   () =>
-    ranked.value
-      .slice(0, limit.value)
-      .flatMap((s) =>
-        s.topics.filter((t) => !t.read).map((t) => ({ subject: s, topic: t })),
-      )[0],
+    ranked.value.slice(0, limit.value).flatMap((s) =>
+      regularTopics(s)
+        .filter((t) => !t.read)
+        .map((t) => ({ subject: s, topic: t })),
+    )[0],
 );
 const weekMinutes = computed(
   () =>
@@ -155,26 +211,26 @@ const accuracy = computed(() =>
 );
 const readCount = computed(
   () =>
-    state.value?.subjects.flatMap((s) => s.topics).filter((t) => t.read)
-      .length ?? 0,
+    state.value?.subjects.flatMap(regularTopics).filter((t) => t.read).length ??
+    0,
 );
 const totalTopics = computed(
-  () => state.value?.subjects.flatMap((s) => s.topics).length ?? 0,
+  () => state.value?.subjects.flatMap(regularTopics).length ?? 0,
 );
 const modal = ref(""),
   pending = ref(false),
   notice = ref(""),
   mobile = ref(false),
   search = ref(""),
-  subjectOrder = ref<"alphabetical" | "weight" | "read-desc" | "read-asc">(
-    "weight",
+  subjectOrder = ref<"alphabetical" | "domain" | "read-desc" | "read-asc">(
+    "domain",
   );
 const profile = ref({
   name: "",
   target: "",
   examDate: "",
   startDate: today(),
-  hours: 14,
+  hours: 2,
   configured: true,
 });
 watch(
@@ -187,7 +243,6 @@ watch(
 const subjectId = ref(""),
   topicId = ref(""),
   name = ref(""),
-  weight = ref(3),
   reason = ref(""),
   rule = ref(""),
   source = ref(""),
@@ -195,13 +250,21 @@ const subjectId = ref(""),
   recall = ref(""),
   questions = ref(0),
   correct = ref(0),
-  minutes = ref(25),
+  minutes = ref(30),
   reminderKind = ref<
     "memorize" | "attention" | "jurisprudence" | "observation"
   >("memorize");
 const activeSubject = computed(() =>
   state.value?.subjects.find((s) => s.id === subjectId.value),
 );
+const sessionTopics = computed(() => {
+  if (!activeSubject.value) return [];
+  const regular = regularTopics(activeSubject.value);
+  const selectedSpecial = activeSubject.value.topics.find(
+    (topic) => topic.id === topicId.value && topic.kind === "eve_review",
+  );
+  return selectedSpecial ? [selectedSpecial, ...regular] : regular;
+});
 const selectedReview = ref("");
 const editingId = ref("");
 const draggedTopicId = ref("");
@@ -238,32 +301,44 @@ const time = computed(
         "0",
       )}:${(timer.value.seconds % 60).toString().padStart(2, "0")}`,
 );
-async function send(command: z.infer<typeof commandSchema>) {
-  if (!query.data.value || pending.value) return false;
-  pending.value = true;
-  notice.value = "";
-  try {
-    const result = await executeCommand({
-      version: query.data.value.version,
-      command,
-    });
-    if (!("data" in result))
-      throw new Error(
-        (result as unknown as { message: string }).message ??
-          "Não foi possível salvar.",
-      );
-    queryClient.setQueryData(["/api/state"], result);
-    await query.refetch();
-    return true;
-  } catch (e) {
-    notice.value = e instanceof Error ? e.message : "Não foi possível salvar.";
-    await query.refetch();
-    return false;
-  } finally {
-    pending.value = false;
-  }
+let sendQueue: Promise<unknown> = Promise.resolve();
+function send(command: z.infer<typeof commandSchema>) {
+  const execute = async () => {
+    if (!query.data.value) return false;
+    pending.value = true;
+    notice.value = "";
+    try {
+      const result = await executeCommand({
+        version: query.data.value.version,
+        command,
+      });
+      if (!("data" in result))
+        throw new Error(
+          (result as unknown as { message: string }).message ??
+            "Não foi possível salvar.",
+        );
+      queryClient.setQueryData(["/api/state"], result);
+      await query.refetch();
+      return true;
+    } catch (e) {
+      notice.value =
+        e instanceof Error ? e.message : "Não foi possível salvar.";
+      await query.refetch();
+      return false;
+    } finally {
+      pending.value = false;
+    }
+  };
+  const result = sendQueue.then(execute, execute);
+  sendQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 function open(type: string, id?: string) {
+  confirmSubjectDeletion.value = false;
+  confirmTopicDeletion.value = false;
   name.value = "";
   reason.value = "";
   rule.value = "";
@@ -272,10 +347,15 @@ function open(type: string, id?: string) {
   questions.value = 0;
   correct.value = 0;
   subjectId.value =
-    id ?? nextTopic.value?.subject.id ?? ranked.value[0]?.id ?? "";
+    id ??
+    nextTopic.value?.subject.id ??
+    ranked.value[0]?.id ??
+    state.value?.subjects[0]?.id ??
+    "";
   topicId.value =
-    state.value?.subjects.find((s) => s.id === subjectId.value)?.topics[0]
-      ?.id ?? "";
+    state.value?.subjects
+      .find((s) => s.id === subjectId.value)
+      ?.topics.find((topic) => topic.kind === "regular")?.id ?? "";
   kind.value = "reading";
   modal.value = type;
 }
@@ -296,7 +376,7 @@ async function save() {
       name: name.value,
     };
   else if (modal.value === "subject")
-    command = { type: "subject", name: name.value, weight: weight.value };
+    command = { type: "subject", name: name.value };
   else if (modal.value === "topic")
     command = {
       type: "topics",
@@ -360,6 +440,22 @@ async function save() {
       timer.value = { seconds: 0, running: false };
   }
 }
+async function deleteSubject() {
+  if (modal.value !== "editSubject" || !confirmSubjectDeletion.value) return;
+  if (await send({ type: "deleteSubject", id: subjectId.value }))
+    modal.value = "";
+}
+async function deleteTopic() {
+  if (modal.value !== "editTopic" || !confirmTopicDeletion.value) return;
+  if (
+    await send({
+      type: "deleteTopic",
+      subjectId: subjectId.value,
+      id: editingId.value,
+    })
+  )
+    modal.value = "";
+}
 function editSubject(s: State["subjects"][number]) {
   open("editSubject", s.id);
   name.value = s.name;
@@ -387,7 +483,11 @@ async function dropTopic(event: TopicDragEvent, targetId: string) {
 }
 async function reorderDraggedTopic(draggedId: string, targetId: string) {
   if (!activeSubject.value || pending.value) return;
-  const topicIds = activeSubject.value.topics.map((topic) => topic.id);
+  const target = activeSubject.value.topics.find(
+    (topic) => topic.id === targetId,
+  );
+  if (target?.kind === "eve_review") return;
+  const topicIds = regularTopics(activeSubject.value).map((topic) => topic.id);
   const from = topicIds.indexOf(draggedId);
   const destination = topicIds.indexOf(targetId);
   draggedTopicId.value = "";
@@ -395,6 +495,11 @@ async function reorderDraggedTopic(draggedId: string, targetId: string) {
   if (from < 0 || destination < 0 || from === destination) return;
   const [moved] = topicIds.splice(from, 1);
   topicIds.splice(destination, 0, moved!);
+  topicIds.push(
+    ...activeSubject.value.topics
+      .filter((topic) => topic.kind === "eve_review")
+      .map((topic) => topic.id),
+  );
   await send({
     type: "reorderTopics",
     subjectId: activeSubject.value.id,
@@ -436,6 +541,18 @@ function startSuggested() {
     kind.value = r.kind;
     return;
   }
+  if (r.kind === "mock") {
+    const subject = ranked.value.find(
+      (candidate) => regularTopics(candidate).length > 0,
+    );
+    if (!subject) {
+      router.push("/materias");
+      return;
+    }
+    open("session", subject.id);
+    kind.value = "mock";
+    return;
+  }
   router.push(
     r.kind === "rest"
       ? "/progresso"
@@ -443,6 +560,14 @@ function startSuggested() {
         ? "/concursos"
         : "/materias",
   );
+}
+function startPlanBlock(
+  block: ReturnType<typeof studyWeek>[number]["blocks"][number],
+) {
+  open("session", block.subject.id);
+  topicId.value = block.topic.id;
+  kind.value = block.sessionKind;
+  minutes.value = block.minutes;
 }
 function review(id: string) {
   selectedReview.value = id;
@@ -466,7 +591,7 @@ const filteredSubjects = computed(() => {
     s.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()),
   );
   const read = (subject: State["subjects"][number]) =>
-    subject.topics.filter((topic) => topic.read).length;
+    regularTopics(subject).filter((topic) => topic.read).length;
   return subjects.sort((a, b) => {
     if (subjectOrder.value === "alphabetical")
       return a.name.localeCompare(b.name, "pt-BR");
@@ -474,13 +599,16 @@ const filteredSubjects = computed(() => {
       return read(b) - read(a) || a.name.localeCompare(b.name, "pt-BR");
     if (subjectOrder.value === "read-asc")
       return read(a) - read(b) || a.name.localeCompare(b.name, "pt-BR");
-    return b.weight - a.weight || a.name.localeCompare(b.name, "pt-BR");
+    return (
+      (a.domain ?? Number.POSITIVE_INFINITY) -
+        (b.domain ?? Number.POSITIVE_INFINITY) ||
+      a.name.localeCompare(b.name, "pt-BR")
+    );
   });
 });
 const modalDescription = computed(() => {
   if (modal.value === "editSubject") return "";
-  if (modal.value === "topic")
-    return `Adicione um ou mais tópicos em ${activeSubject.value?.name ?? "esta matéria"}.`;
+  if (modal.value === "topic") return "Adicione um ou mais tópicos";
   if (modal.value === "topicsList")
     return "Arraste os tópicos pela alça lateral para definir a ordem de estudo.";
   return "Salvo no seu espaço de estudo. Cada registro ajuda a orientar o próximo passo.";
@@ -512,21 +640,6 @@ const table = useVueTable({
   columns,
   getCoreRowModel: getCoreRowModel(),
 });
-const weekly = [
-  "Administrativo · tópicos 1 a 10",
-  "Administrativo · tópicos 11 a 19",
-  "Constitucional · tópicos 1 a 8",
-  "Constitucional · tópicos 9 a 16",
-  "Contabilidade Geral e Avançada",
-  "Tributário e Legislação Tributária",
-  "Auditoria e Controle Externo",
-  "Financeiro e Contabilidade Pública",
-  "Administração Pública e Economia",
-  "Penal — partes Geral e Especial",
-  "Direito Civil e TI",
-  "Alterações Legislativas e Julgados",
-  "Simulado e Revisões de Véspera",
-];
 const days = computed(() => {
   const now = new Date(today() + "T12:00:00");
   const monday = addDays(today(), -((now.getDay() + 6) % 7));
@@ -550,7 +663,7 @@ const modalTitles: Record<string, string> = {
   review: "Concluir revisão",
 };
 const modalTitle = computed(() =>
-  modal.value === "topicsList"
+  ["topic", "topicsList"].includes(modal.value)
     ? (activeSubject.value?.name ?? "Tópicos")
     : modalTitles[modal.value],
 );
@@ -687,7 +800,7 @@ const modalTitle = computed(() =>
                 >{{ Math.floor(weekMinutes / 60) }}<small>h</small>
                 {{ weekMinutes % 60 }}<small>min</small></strong
               >
-              <p>de {{ state.profile.hours }}h na meta semanal</p>
+              <p>de {{ state.profile.hours }}h disponíveis por dia</p>
             </article>
             <article>
               <span>Questões resolvidas <NotebookPen :size="17" /></span
@@ -722,7 +835,9 @@ const modalTitle = computed(() =>
               <section class="card daily">
                 <div class="section-title">
                   <h2>Seu próximo passo</h2>
-                  <span class="pill">{{ currentPhase }}</span>
+                  <span class="pill">{{
+                    scenarioLabels[outline.scenario]
+                  }}</span>
                 </div>
                 <div class="next-study">
                   <div class="book-tile"><BookOpen :size="28" /></div>
@@ -732,9 +847,11 @@ const modalTitle = computed(() =>
                         ? "DESCANSAR TAMBÉM É ESTUDAR"
                         : suggested.kind === "review"
                           ? "RECUPERE O QUE APRENDEU"
-                          : suggested.kind === "active"
-                            ? "CICLO ATIVO"
-                            : "CONSTRUA SEU MAPA"
+                          : suggested.kind === "mock"
+                            ? "TESTE SUA PREPARAÇÃO"
+                            : suggested.kind === "active"
+                              ? "CICLO ATIVO"
+                              : "CONSTRUA SEU MAPA"
                     }}</span>
                     <h3>
                       {{
@@ -742,9 +859,11 @@ const modalTitle = computed(() =>
                           ? "Hoje é dia de recarregar."
                           : suggested.kind === "review"
                             ? "Sua revisão está esperando."
-                            : "subject" in suggested
-                              ? suggested.subject?.name
-                              : "Organize os tópicos do seu edital"
+                            : suggested.kind === "mock"
+                              ? "Hora do simulado."
+                              : "subject" in suggested
+                                ? suggested.subject?.name
+                                : "Organize os tópicos do seu edital"
                       }}
                     </h3>
                     <p>
@@ -755,7 +874,9 @@ const modalTitle = computed(() =>
                             ? suggested.topic?.name
                             : suggested.kind === "review"
                               ? "Um pequeno toque para manter a memória viva."
-                              : "Adicione os assuntos e comece pelas matérias de maior peso."
+                              : suggested.kind === "mock"
+                                ? "Resolva uma prova completa e corrija cada erro."
+                                : "Adicione os assuntos e comece pelas matérias de maior peso."
                       }}
                     </p>
                   </div>
@@ -764,7 +885,11 @@ const modalTitle = computed(() =>
                   <span
                     ><Clock :size="15" />
                     {{
-                      suggested.kind === "review" ? "2–20 min" : "20–40 min"
+                      suggested.kind === "review"
+                        ? "2–20 min"
+                        : suggested.kind === "mock"
+                          ? "Tempo de prova"
+                          : "20–40 min"
                     }}</span
                   ><span
                     ><Check :size="15" />
@@ -785,9 +910,11 @@ const modalTitle = computed(() =>
                       ? "Ver minha caminhada"
                       : suggested.kind === "review"
                         ? "Fazer minha revisão"
-                        : suggested.kind === "organize"
-                          ? "Organizar minha preparação"
-                          : "Começar minha sessão"
+                        : suggested.kind === "mock"
+                          ? "Registrar simulado"
+                          : suggested.kind === "organize"
+                            ? "Organizar minha preparação"
+                            : "Começar minha sessão"
                   }}
                   <ArrowRight :size="16"
                 /></Button>
@@ -805,7 +932,9 @@ const modalTitle = computed(() =>
               <section class="card">
                 <div class="section-title">
                   <h2>Uma semana de cada vez</h2>
-                  <span class="micro">Meta: {{ state.profile.hours }}h</span>
+                  <span class="micro"
+                    >Meta: {{ state.profile.hours }}h/dia</span
+                  >
                 </div>
                 <div class="week-days">
                   <div
@@ -840,32 +969,35 @@ const modalTitle = computed(() =>
               <section class="card plan-summary">
                 <div class="section-title">
                   <h2>Sua jornada</h2>
-                  <span class="micro">90 dias</span>
+                  <span class="micro">{{
+                    scenarioLabels[outline.scenario]
+                  }}</span>
                 </div>
                 <div class="phase-counter">
-                  <strong>{{ week }}</strong
-                  ><span>de 13 semanas<br /><b>Um dia de cada vez.</b></span>
-                </div>
-                <div class="progress">
-                  <i :style="{ width: (week / 13) * 100 + '%' }"></i>
+                  <strong>{{ outline.daysRemaining ?? "—" }}</strong
+                  ><span
+                    >{{
+                      outline.daysRemaining === null
+                        ? "prova ainda sem data"
+                        : "dias até a prova prioritária"
+                    }}<br /><b>Um dia de cada vez.</b></span
+                  >
                 </div>
                 <div
-                  v-for="(p, i) in ['Fundação', 'Consolidação', 'Reta final']"
-                  :key="p"
-                  :class="['phase-row', { selected: p === currentPhase }]"
+                  v-for="(item, i) in outline.phases"
+                  :key="item.kind"
+                  :class="['phase-row', { selected: i === 0 }]"
                 >
                   <span>{{ i + 1 }}</span>
                   <div>
-                    <strong>{{ p }}</strong
+                    <strong>{{ phaseLabels[item.kind] }}</strong
                     ><small>{{
-                      [
-                        "Semanas 1–6 · conhecer o terreno",
-                        "Semanas 7–11 · recuperar e praticar",
-                        "Semanas 12–13 · refinar e revisar",
-                      ][i]
+                      item.days === null
+                        ? phaseDescriptions[item.kind]
+                        : item.days + " dias"
                     }}</small>
                   </div>
-                  <span v-if="p === currentPhase" class="phase-dot"></span>
+                  <span v-if="i === 0" class="phase-dot"></span>
                 </div>
                 <RouterLink to="/plano" class="text-link"
                   >Explorar meu plano <ArrowRight :size="15"
@@ -924,23 +1056,23 @@ const modalTitle = computed(() =>
                 required
             /></label>
             <label
-              >Horas disponíveis por semana<input
+              >Horas disponíveis por dia<input
                 v-model.number="profile.hours"
                 type="number"
                 min="1"
-                max="70"
+                max="24"
                 required
             /></label>
             <div class="info-box">
               {{
-                profile.hours < 10
-                  ? "Foco nas 6 matérias de maior peso."
-                  : profile.hours < 14
-                    ? "Foco nas 10 matérias de maior peso."
-                    : "Tempo para trabalhar as 16 matérias da coleção."
+                profile.hours * 6 < 10
+                  ? "Foco nas 6 matérias prioritárias."
+                  : profile.hours * 6 < 14
+                    ? "Foco nas 10 matérias prioritárias."
+                    : "Tempo para trabalhar todas as matérias da preparação."
               }}
-              A prioridade diária considera os seus editais e preserva as
-              revisões.
+              A prioridade considera a data das provas, o peso nos editais e o
+              seu domínio em cada matéria.
             </div>
             <Button :disabled="pending"
               >Salvar meu planejamento <Check :size="16"
@@ -952,7 +1084,7 @@ const modalTitle = computed(() =>
               <div class="eyebrow">CONHEÇA O TERRENO</div>
               <h1>Matérias e tópicos.</h1>
               <p>
-                Maior peso primeiro. Leia a matéria inteira antes de aprofundar.
+                Comece pelo que mais vale na prova e pelo que você menos domina.
               </p>
             </div>
             <Button @click="open('subject')"
@@ -970,7 +1102,7 @@ const modalTitle = computed(() =>
               <span>Ordenar por</span>
               <select v-model="subjectOrder" aria-label="Ordenar matérias">
                 <option value="alphabetical">Ordem alfabética</option>
-                <option value="weight">Maior peso</option>
+                <option value="domain">Menor domínio</option>
                 <option value="read-desc">Mais tópicos lidos</option>
                 <option value="read-asc">Menos tópicos lidos</option>
               </select>
@@ -988,21 +1120,29 @@ const modalTitle = computed(() =>
                   String(index + 1).padStart(2, "0")
                 }}</span
                 ><label class="weight-label"
-                  >Peso-base
+                  >Domínio
                   <select
-                    :value="s.weight"
-                    :aria-label="`Peso de ${s.name}`"
+                    :value="s.domain ?? ''"
+                    :aria-label="`Domínio de ${s.name}`"
                     @change="
+                      ($event.target as HTMLSelectElement).value !== '' &&
                       send({
-                        type: 'weight',
+                        type: 'domain',
                         id: s.id,
-                        weight: Number(
+                        domain: Number(
                           ($event.target as HTMLSelectElement).value,
                         ),
                       })
                     "
                   >
-                    <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
+                    <option value="" disabled>Avaliar</option>
+                    <option
+                      v-for="option in domainOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.value }} · {{ option.label }}
+                    </option>
                   </select></label
                 >
               </div>
@@ -1024,16 +1164,16 @@ const modalTitle = computed(() =>
                 >Abrir material ↗</a
               >
               <p class="micro">
-                {{ s.topics.filter((t) => t.read).length }} de
-                {{ s.topics.length }} tópicos lidos
+                {{ regularTopics(s).filter((t) => t.read).length }} de
+                {{ regularTopics(s).length }} tópicos lidos
               </p>
               <div class="progress">
                 <i
                   :style="{
                     width:
-                      (s.topics.length
-                        ? (s.topics.filter((t) => t.read).length /
-                            s.topics.length) *
+                      (regularTopics(s).length
+                        ? (regularTopics(s).filter((t) => t.read).length /
+                            regularTopics(s).length) *
                           100
                         : 0) + '%',
                   }"
@@ -1045,7 +1185,7 @@ const modalTitle = computed(() =>
                     s.topics.length
                   }})</Button
                 ><Button
-                  v-if="s.topics.length"
+                  v-if="regularTopics(s).length"
                   variant="outline"
                   @click="open('session', s.id)"
                   ><Play :size="14" /> Estudar</Button
@@ -1057,75 +1197,121 @@ const modalTitle = computed(() =>
         <template v-else-if="route.path === '/plano'"
           ><div class="page-heading">
             <div>
-              <div class="eyebrow">DIREÇÃO PARA CADA SEMANA</div>
-              <h1>Seu plano de 90 dias.</h1>
+              <div class="eyebrow">UM CAMINHO PARA O SEU CENÁRIO</div>
+              <h1>{{ scenarioLabels[outline.scenario] }}.</h1>
               <p>
                 {{ limit }} matérias prioritárias ·
-                {{ state.profile.hours }} horas por semana · domingo livre
+                {{ state.profile.hours }} horas por dia · domingo livre
               </p>
             </div>
           </div>
-          <div class="info-box">
-            {{
-              focusContest?.examDate &&
-              Math.ceil(
-                (Date.parse(focusContest.examDate) - Date.parse(today())) /
-                  86400000,
-              ) <= 30
-                ? "Rota curta: Revisões de Véspera → Alterações Legislativas → Julgados → Simulado."
-                : "Roteiro-base da coleção. A ordem diária considera a prova mais próxima, o peso no edital e os tópicos compartilhados."
-            }}
-            Para 31–59 dias, o guia não define uma rota própria: ajuste o ritmo
-            sem eliminar as revisões.
-          </div>
-          <div class="plan-layout">
-            <section class="card">
-              <h2>As três fases</h2>
-              <div
-                v-for="(w, i) in weekly"
-                :key="w"
-                :class="['plan-week', { current: i + 1 === week }]"
-              >
-                <span>{{ String(i + 1).padStart(2, "0") }}</span>
+          <section v-if="!readiness.ready" class="card onboarding-card">
+            <div class="eyebrow">ANTES DE GERAR O PLANO</div>
+            <h2>Complete sua configuração.</h2>
+            <p>
+              O plano precisa conhecer seu tempo, seus editais e seu domínio em
+              cada matéria.
+            </p>
+            <ol class="onboarding-steps">
+              <li :class="{ complete: !readiness.needsProfile }">
+                <strong>Defina início e horas por dia</strong>
+                <RouterLink to="/configuracoes">Meu planejamento</RouterLink>
+              </li>
+              <li :class="{ complete: !readiness.needsContest }">
+                <strong>Escolha os concursos e editais</strong>
+                <RouterLink to="/concursos">Meus concursos</RouterLink>
+              </li>
+              <li :class="{ complete: !readiness.missingDomains.length }">
+                <strong>Avalie seu domínio nas matérias</strong>
+                <RouterLink to="/materias">
+                  {{
+                    readiness.missingDomains.length
+                      ? readiness.missingDomains.length + " pendentes"
+                      : "Concluído"
+                  }}
+                </RouterLink>
+              </li>
+            </ol>
+          </section>
+          <template v-else>
+            <div class="info-box">
+              {{
+                outline.daysRemaining === null
+                  ? "A prova ainda não tem data. O plano começa pelas matérias de maior prioridade e será recalculado quando a data for definida."
+                  : outline.daysRemaining +
+                    " dias até o primeiro grupo de provas. O plano se adapta automaticamente conforme o tempo passa."
+              }}
+            </div>
+            <section class="card study-calendar">
+              <div class="section-title">
                 <div>
-                  <small>{{
-                    i < 6 ? "FUNDAÇÃO" : i < 11 ? "CONSOLIDAÇÃO" : "RETA FINAL"
-                  }}</small
-                  ><strong>{{ w }}</strong>
-                  <p>
-                    {{
-                      i < 6
-                        ? "Primeira leitura · sem revisões antecipadas"
-                        : i < 11
-                          ? "Metade do tempo em questões + revisões"
-                          : "Consolidar pontos frágeis e preparar a prova"
-                    }}
-                  </p>
+                  <h2>Próximos blocos</h2>
+                  <p class="micro">30 minutos por bloco · domingo livre</p>
                 </div>
-                <span v-if="i + 1 === week" class="pill">Agora</span>
+              </div>
+              <div class="study-days">
+                <article v-for="day in weeklySchedule" :key="day.date">
+                  <strong>{{ day.date.split("-").reverse().join("/") }}</strong>
+                  <div v-if="day.blocks.length" class="study-blocks">
+                    <button
+                      v-for="(block, index) in day.blocks"
+                      :key="`${day.date}-${index}`"
+                      type="button"
+                      :class="['study-block', block.role]"
+                      @click="startPlanBlock(block)"
+                    >
+                      <small>{{
+                        block.role === "main" ? "Principal" : "Encaixe"
+                      }}</small>
+                      <span>{{ block.subject.name }}</span>
+                      <b>{{ block.label ?? block.topic.name }}</b>
+                    </button>
+                  </div>
+                  <p v-else class="micro">Sem bloco pendente.</p>
+                </article>
               </div>
             </section>
-            <section class="card routine">
-              <h2>Sua semana-padrão</h2>
-              <h3>Segunda a quinta</h3>
-              <p>
-                50 min de bloco principal<br />10 min de recuperação ativa<br />50
-                min de questões<br />10 min de caderno de erros
-              </p>
-              <h3>Sexta-feira</h3>
-              <p>Revisões de 7 dias e questões mistas.</p>
-              <h3>Sábado</h3>
-              <p>
-                2h de conteúdo · 1h de revisão · 1h de questões cronometradas.
-              </p>
-              <h3>Domingo</h3>
-              <p>Descanso de verdade.</p>
-              <div class="info-box">
-                Na Fundação, priorize a leitura completa. A rotina de questões e
-                revisões se aplica à consolidação.
-              </div>
-            </section>
-          </div></template
+            <div class="plan-layout">
+              <section class="card">
+                <h2>Caminho do cenário</h2>
+                <div
+                  v-for="(item, index) in outline.phases"
+                  :key="item.kind"
+                  class="plan-week"
+                >
+                  <span>{{ String(index + 1).padStart(2, "0") }}</span>
+                  <div>
+                    <small>{{
+                      item.days === null ? "ETAPA" : item.days + " DIAS"
+                    }}</small>
+                    <strong>{{ phaseLabels[item.kind] }}</strong>
+                    <p>{{ phaseDescriptions[item.kind] }}</p>
+                  </div>
+                </div>
+              </section>
+              <section class="card routine">
+                <h2>Como usar o plano</h2>
+                <h3>Blocos de estudo</h3>
+                <p>
+                  Cada bloco possui 30 minutos. Se um tópico não terminar, ele
+                  continua como seu próximo passo.
+                </p>
+                <h3>Matéria principal</h3>
+                <p>
+                  A matéria de maior prioridade conduz a leitura até o volume
+                  inteiro ser concluído.
+                </p>
+                <h3>Matéria de encaixe</h3>
+                <p>Use a alternativa mais leve nos intervalos e dias ruins.</p>
+                <h3>Domingo</h3>
+                <p>Descanso de verdade.</p>
+                <div class="info-box">
+                  O plano orienta, mas não bloqueia. Estudar fora da ordem
+                  apenas recalcula os próximos passos.
+                </div>
+              </section>
+            </div>
+          </template></template
         >
         <template v-else-if="route.path === '/revisoes'"
           ><div class="page-heading">
@@ -1151,7 +1337,7 @@ const modalTitle = computed(() =>
             <article class="card">
               <span class="pill">D + 30</span>
               <h3>Teste o que ficou</h3>
-              <p>20 questões. Mais de 80% de acertos para sair da fila.</p>
+              <p>20 questões para registrar o que ficou e localizar lacunas.</p>
             </article>
           </div>
           <section class="card">
@@ -1357,17 +1543,17 @@ const modalTitle = computed(() =>
                 <i
                   :style="{
                     width:
-                      (s.topics.length
-                        ? (s.topics.filter((t) => t.read).length /
-                            s.topics.length) *
+                      (regularTopics(s).length
+                        ? (regularTopics(s).filter((t) => t.read).length /
+                            regularTopics(s).length) *
                           100
                         : 0) + '%',
                   }"
                 />
               </div>
               <small
-                >{{ s.topics.filter((t) => t.read).length }}/{{
-                  s.topics.length
+                >{{ regularTopics(s).filter((t) => t.read).length }}/{{
+                  regularTopics(s).length
                 }}
                 lidos</small
               >
@@ -1442,11 +1628,16 @@ const modalTitle = computed(() =>
                   dragging: draggedTopicId === topic.id,
                   'drag-over': dragOverTopicId === topic.id,
                 }"
-                @dragover.prevent="dragOverTopicId = topic.id"
-                @drop.prevent="dropTopic($event, topic.id)"
+                @dragover.prevent="
+                  topic.kind === 'regular' && (dragOverTopicId = topic.id)
+                "
+                @drop.prevent="
+                  topic.kind === 'regular' && dropTopic($event, topic.id)
+                "
               >
                 <span class="topic-position">{{ index + 1 }}</span>
                 <button
+                  v-if="topic.kind === 'regular'"
                   type="button"
                   class="topic-drag-handle"
                   draggable="true"
@@ -1467,12 +1658,16 @@ const modalTitle = computed(() =>
                   <GripVertical :size="17" />
                 </button>
                 <button
+                  v-if="topic.kind === 'regular'"
                   type="button"
                   class="edit-name topic-manager-name"
                   @click="editTopic(activeSubject!, topic)"
                 >
                   {{ topic.name }}
                 </button>
+                <span v-else class="topic-manager-name">
+                  {{ topic.name }} <small>tópico fixo</small>
+                </span>
               </li>
             </ol>
             <p v-if="notice" role="alert" class="error-message">
@@ -1504,9 +1699,17 @@ const modalTitle = computed(() =>
               >Matéria<select
                 v-model="subjectId"
                 required
-                @change="topicId = activeSubject?.topics[0]?.id ?? ''"
+                @change="
+                  topicId = activeSubject
+                    ? (regularTopics(activeSubject)[0]?.id ?? '')
+                    : ''
+                "
               >
-                <option v-for="s in ranked" :key="s.id" :value="s.id">
+                <option
+                  v-for="s in state?.subjects ?? []"
+                  :key="s.id"
+                  :value="s.id"
+                >
                   {{ s.name }}
                 </option>
               </select></label
@@ -1517,7 +1720,7 @@ const modalTitle = computed(() =>
               >{{ modal === "error" ? "Assunto da questão" : "Nome"
               }}<input v-model="name" required maxlength="200" /></label
             ><label v-if="modal === 'topic'"
-              >Tópicos <small>um por linha</small
+              >Tópicos <small>(um por linha)</small
               ><textarea
                 v-model="name"
                 required
@@ -1529,22 +1732,10 @@ const modalTitle = computed(() =>
                 v-model="source"
                 type="url"
                 placeholder="https://…" /></label
-            ><label v-if="modal === 'subject'"
-              >Peso no edital<input
-                v-model.number="weight"
-                type="number"
-                min="1"
-                max="10"
-                required
-            /></label>
-            <template v-if="modal === 'session'"
+            ><template v-if="modal === 'session'"
               ><label
                 >Tópico<select v-model="topicId" required>
-                  <option
-                    v-for="t in activeSubject?.topics"
-                    :key="t.id"
-                    :value="t.id"
-                  >
+                  <option v-for="t in sessionTopics" :key="t.id" :value="t.id">
                     {{ t.name }}
                   </option>
                 </select></label
@@ -1673,7 +1864,86 @@ const modalTitle = computed(() =>
                     : "Salvar"
               }}
               <Check :size="16"
-            /></Button></form></DialogContent></DialogPortal
-    ></DialogRoot>
+            /></Button>
+            <div v-if="modal === 'editSubject'" class="delete-record-area">
+              <Button
+                v-if="!confirmSubjectDeletion"
+                type="button"
+                variant="danger"
+                class="full"
+                :disabled="pending"
+                @click="confirmSubjectDeletion = true"
+              >
+                <Trash2 :size="16" /> Excluir matéria
+              </Button>
+              <div v-else class="delete-record-confirmation" role="alert">
+                <strong>Excluir “{{ activeSubject?.name }}”?</strong>
+                <p>
+                  Os tópicos, o histórico de estudos, as revisões e os vínculos
+                  com concursos desta matéria também serão excluídos. Esta ação
+                  não pode ser desfeita.
+                </p>
+                <div class="delete-record-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="pending"
+                    @click="confirmSubjectDeletion = false"
+                    >Cancelar</Button
+                  >
+                  <Button
+                    type="button"
+                    variant="danger"
+                    :disabled="pending"
+                    @click="deleteSubject"
+                  >
+                    <Trash2 :size="16" />
+                    {{ pending ? "Excluindo…" : "Excluir definitivamente" }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div v-if="modal === 'editTopic'" class="delete-record-area">
+              <Button
+                v-if="!confirmTopicDeletion"
+                type="button"
+                variant="danger"
+                class="full"
+                :disabled="pending"
+                @click="confirmTopicDeletion = true"
+              >
+                <Trash2 :size="16" /> Excluir tópico
+              </Button>
+              <div v-else class="delete-record-confirmation" role="alert">
+                <strong>Excluir “{{ name }}”?</strong>
+                <p>
+                  O histórico de estudos, as revisões e os vínculos com
+                  concursos deste tópico também serão excluídos. Esta ação não
+                  pode ser desfeita.
+                </p>
+                <div class="delete-record-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="pending"
+                    @click="confirmTopicDeletion = false"
+                    >Cancelar</Button
+                  >
+                  <Button
+                    type="button"
+                    variant="danger"
+                    :disabled="pending"
+                    @click="deleteTopic"
+                  >
+                    <Trash2 :size="16" />
+                    {{ pending ? "Excluindo…" : "Excluir definitivamente" }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </form></DialogContent
+        ></DialogPortal
+      ></DialogRoot
+    >
   </div>
 </template>

@@ -41,13 +41,13 @@ export const studyPlans = pgTable(
     target: text("target").notNull().default(""),
     examDate: date("exam_date"),
     startDate: date("start_date").notNull(),
-    weeklyHours: doublePrecision("weekly_hours").notNull().default(14),
+    dailyHours: doublePrecision("daily_hours").notNull().default(2),
     configured: boolean("configured").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("study_plans_workspace_idx").on(t.workspaceId),
-    check("study_plans_hours_check", sql`${t.weeklyHours} between 1 and 70`),
+    check("study_plans_hours_check", sql`${t.dailyHours} between 1 and 24`),
   ],
 );
 export const subjects = pgTable(
@@ -58,15 +58,24 @@ export const subjects = pgTable(
       .notNull()
       .references(() => studyPlans.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    weight: doublePrecision("weight").notNull().default(1),
+    legacyWeight: doublePrecision("weight").notNull().default(1),
+    domain: integer("domain"),
     materialUrl: text("material_url"),
     position: integer("position").generatedByDefaultAsIdentity(),
     createdAt: createdAt(),
   },
   (t) => [
-    index("subjects_plan_weight_idx").on(t.planId, t.weight.desc(), t.position),
+    index("subjects_plan_weight_idx").on(
+      t.planId,
+      t.legacyWeight.desc(),
+      t.position,
+    ),
     check("subjects_name_check", sql`length(trim(${t.name})) > 0`),
-    check("subjects_weight_check", sql`${t.weight} between 1 and 10`),
+    check("subjects_weight_check", sql`${t.legacyWeight} between 1 and 10`),
+    check(
+      "subjects_domain_check",
+      sql`${t.domain} is null or ${t.domain} between 0 and 5`,
+    ),
     check("subjects_position_check", sql`${t.position} >= 0`),
   ],
 );
@@ -80,6 +89,9 @@ export const topics = pgTable(
     name: text("name").notNull(),
     read: boolean("is_read").notNull().default(false),
     mastered: boolean("is_mastered").notNull().default(false),
+    kind: text("kind", { enum: ["regular", "eve_review"] })
+      .notNull()
+      .default("regular"),
     position: integer("position").generatedByDefaultAsIdentity(),
     createdAt: createdAt(),
   },
@@ -87,6 +99,7 @@ export const topics = pgTable(
     uniqueIndex("topics_id_subject_idx").on(t.id, t.subjectId),
     index("topics_subject_position_idx").on(t.subjectId, t.position),
     check("topics_name_check", sql`length(trim(${t.name})) > 0`),
+    check("topics_kind_check", sql`${t.kind} in ('regular','eve_review')`),
     check("topics_position_check", sql`${t.position} >= 0`),
   ],
 );

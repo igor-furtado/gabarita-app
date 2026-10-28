@@ -4,11 +4,13 @@ import {
   rankedCandidates,
   relevantTopics,
   explainCandidate,
+  scenario,
+  urgentStep,
 } from "./planning.js";
 export const subjectSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  weight: z.number().min(1).max(10),
+  domain: z.number().int().min(0).max(5).nullable().default(null),
   materialUrl: z.string().optional(),
   topics: z.array(
     z.object({
@@ -16,6 +18,7 @@ export const subjectSchema = z.object({
       name: z.string().min(1),
       read: z.boolean(),
       mastered: z.boolean(),
+      kind: z.enum(["regular", "eve_review"]).default("regular"),
     }),
   ),
 });
@@ -26,7 +29,7 @@ export const profileSchema = z.object({
     .string()
     .refine((v) => v === "" || validDate(v), "Data inválida."),
   startDate: z.string().refine(validDate, "Data inválida."),
-  hours: z.number().min(1).max(70),
+  hours: z.number().min(1).max(24),
   configured: z.boolean(),
 });
 export const sessionSchema = z.object({
@@ -103,7 +106,6 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("subject"),
     name: z.string().min(1).max(120),
-    weight: z.number().min(1).max(10),
   }),
   z.object({
     type: z.literal("editSubject"),
@@ -117,15 +119,24 @@ export const commandSchema = z.discriminatedUnion("type", [
       ),
   }),
   z.object({
+    type: z.literal("deleteSubject"),
+    id: z.string().uuid(),
+  }),
+  z.object({
     type: z.literal("editTopic"),
     subjectId: z.string().uuid(),
     id: z.string().uuid(),
     name: z.string().min(1).max(200),
   }),
   z.object({
-    type: z.literal("weight"),
+    type: z.literal("deleteTopic"),
+    subjectId: z.string().uuid(),
     id: z.string().uuid(),
-    weight: z.number().min(1).max(10),
+  }),
+  z.object({
+    type: z.literal("domain"),
+    id: z.string().uuid(),
+    domain: z.number().int().min(0).max(5),
   }),
   z.object({
     type: z.literal("topic"),
@@ -197,14 +208,22 @@ export function initialState(): State {
       target: "",
       examDate: "",
       startDate: today(),
-      hours: 14,
+      hours: 2,
       configured: false,
     },
-    subjects: names.map((name, i) => ({
+    subjects: names.map((name) => ({
       id: crypto.randomUUID(),
       name,
-      weight: i < 5 ? 3 : 1,
-      topics: [],
+      domain: null,
+      topics: [
+        {
+          id: crypto.randomUUID(),
+          name: "Revisão de Véspera",
+          read: false,
+          mastered: false,
+          kind: "eve_review" as const,
+        },
+      ],
     })),
     sessions: [],
     reviews: [],
@@ -224,7 +243,8 @@ export function phase(s: State, date = today()) {
     ? Math.ceil((Date.parse(examDate) - Date.parse(date)) / 86400000)
     : null;
   if (remaining === null) {
-    const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
+    const weeklyHours = s.profile.hours * 6;
+    const limit = weeklyHours < 10 ? 6 : weeklyHours < 14 ? 10 : 16;
     const ids = [
       ...new Set(rankedCandidates(s, date).map((c) => c.subject.id)),
     ].slice(0, limit);
@@ -232,7 +252,14 @@ export function phase(s: State, date = today()) {
       ? s.subjects
           .filter((sub) => ids.includes(sub.id))
           .map((sub) => ({ ...sub, topics: relevantTopics(s, sub.id, date) }))
-      : [...s.subjects].sort((a, b) => b.weight - a.weight).slice(0, limit);
+      : [...s.subjects]
+          .sort(
+            (a, b) =>
+              (a.domain ?? Number.POSITIVE_INFINITY) -
+                (b.domain ?? Number.POSITIVE_INFINITY) ||
+              a.name.localeCompare(b.name, "pt-BR"),
+          )
+          .slice(0, limit);
     return selected.length > 0 &&
       selected.every(
         (sub) => sub.topics.length > 0 && sub.topics.every((t) => t.read),
@@ -250,30 +277,16 @@ export function phase(s: State, date = today()) {
 }
 export type Command = z.infer<typeof commandSchema>;
 export class DomainError extends Error {}
-export function validateSession(
-  session: z.infer<typeof sessionSchema>,
-  volumeRead: boolean,
-) {
+export function validateSession(session: z.infer<typeof sessionSchema>) {
   if (session.correct > session.questions)
     throw new DomainError("Acertos não podem superar questões.");
-  if (session.kind === "active" && !volumeRead)
-    throw new DomainError(
-      "Conclua a primeira leitura da matéria antes do ciclo ativo.",
-    );
-  if (
-    session.kind === "active" &&
-    session.recall.trim().split(/\n/).filter(Boolean).length < 5
-  )
-    throw new DomainError("Escreva pelo menos cinco linhas de memória.");
 }
 export function validateReview(
-  interval: number,
+  _interval: number,
   questions: number,
   correct: number,
 ) {
   if (correct > questions) throw new DomainError("Acertos inválidos.");
-  if (interval === 30 && questions < 20)
-    throw new DomainError("A revisão de 30 dias exige pelo menos 20 questões.");
 }
 
 export function recommendation(s: State, date = today()) {
@@ -282,6 +295,8 @@ export function recommendation(s: State, date = today()) {
       kind: "rest" as const,
       reason: "Domingo é reservado ao descanso na metodologia.",
     };
+  if (s.contests?.length && scenario(s, date).kind === "urgent")
+    return urgentStep(s, date);
   const due = s.reviews
     .filter((r) => !r.done && r.due <= date)
     .sort((a, b) => a.due.localeCompare(b.due))[0];
@@ -296,11 +311,15 @@ export function recommendation(s: State, date = today()) {
     const candidates = rankedCandidates(s, date).filter(
       ({ subject, topic }) =>
         !topic.read ||
-        (!topic.mastered &&
+        (!s.sessions.some(
+          (session) =>
+            session.topicId === topic.id && session.kind === "active",
+        ) &&
           !s.reviews.some((r) => r.topicId === topic.id && !r.done) &&
           relevantTopics(s, subject.id, date).every((t) => t.read)),
     );
-    const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
+    const weeklyHours = s.profile.hours * 6;
+    const limit = weeklyHours < 10 ? 6 : weeklyHours < 14 ? 10 : 16;
     const subjectIds = [...new Set(candidates.map((c) => c.subject.id))].slice(
       0,
       limit,
@@ -317,7 +336,10 @@ export function recommendation(s: State, date = today()) {
           reason: explainCandidate(candidate),
         };
       if (
-        !topic.mastered &&
+        !s.sessions.some(
+          (session) =>
+            session.topicId === topic.id && session.kind === "active",
+        ) &&
         !s.reviews.some((r) => r.topicId === topic.id && !r.done) &&
         relevantTopics(s, subject.id, date).every((t) => t.read)
       )
@@ -335,30 +357,34 @@ export function recommendation(s: State, date = today()) {
         : "Nenhum concurso ativo com prova futura. Cadastre um concurso ou atualize as datas.",
     };
   }
-  const limit = s.profile.hours < 10 ? 6 : s.profile.hours < 14 ? 10 : 16;
+  const weeklyHours = s.profile.hours * 6;
+  const limit = weeklyHours < 10 ? 6 : weeklyHours < 14 ? 10 : 16;
   const eligible = [...s.subjects]
-    .sort((a, b) => b.weight - a.weight)
+    .filter((subject) => subject.domain !== null)
+    .sort(
+      (a, b) => a.domain! - b.domain! || a.name.localeCompare(b.name, "pt-BR"),
+    )
     .slice(0, limit);
-  const last = s.sessions.at(-1)?.subjectId;
-  const ordered = [
-    ...eligible.filter((x) => x.id !== last),
-    ...eligible.filter((x) => x.id === last),
-  ];
+  const ordered = eligible;
   for (const subject of ordered) {
-    const topic = subject.topics.find((t) => !t.read);
+    const topic = subject.topics.find(
+      (candidate) => candidate.kind === "regular" && !candidate.read,
+    );
     if (topic)
       return {
         kind: "reading" as const,
         subject,
         topic,
         reason:
-          "Primeira leitura, considerando o peso da matéria e a alternância.",
+          "Primeira leitura, considerando o domínio informado na matéria.",
       };
   }
   for (const subject of ordered) {
     const topic = subject.topics.find(
       (t) =>
-        !t.mastered && !s.reviews.some((r) => r.topicId === t.id && !r.done),
+        !s.sessions.some(
+          (session) => session.topicId === t.id && session.kind === "active",
+        ) && !s.reviews.some((r) => r.topicId === t.id && !r.done),
     );
     if (topic)
       return {

@@ -38,6 +38,7 @@ it("edital relacional preserva histórico, valida vínculos e isola espaços", a
     expect(s.subjects[0]!.topics.map((topic) => topic.name)).toEqual([
       "Fora do edital",
       "Comum",
+      "Revisão de Véspera",
     ]);
     const topic = s.subjects[0]!.topics[0]!;
     const contest: Contest = {
@@ -74,6 +75,23 @@ it("edital relacional preserva histórico, valida vínculos e isola espaços", a
         kind: "reading",
       },
     });
+    const otherTopic = s.subjects[0]!.topics.find(
+      (candidate) => candidate.kind === "regular" && candidate.id !== topic.id,
+    )!;
+    await send({
+      type: "session",
+      session: {
+        id: crypto.randomUUID(),
+        subjectId: subject.id,
+        topicId: otherTopic.id,
+        date: today(),
+        minutes: 20,
+        recall: "",
+        questions: 0,
+        correct: 0,
+        kind: "reading",
+      },
+    });
     await send({
       type: "session",
       session: {
@@ -96,7 +114,7 @@ it("edital relacional preserva histórico, valida vínculos e isola espaços", a
       contest: { ...contest, subjects: [], archived: true },
     });
     const before = await readWorkspace(box.db);
-    expect(before.data.sessions).toHaveLength(2);
+    expect(before.data.sessions).toHaveLength(3);
     expect(before.data.reviews).toHaveLength(3);
     const foreign = (await readWorkspace(box.db, 2)).data.subjects[0]!;
     await expect(

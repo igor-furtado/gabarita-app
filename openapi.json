@@ -44,7 +44,7 @@
                             "hours": {
                               "type": "number",
                               "minimum": 1,
-                              "maximum": 70
+                              "maximum": 24
                             },
                             "configured": {
                               "type": "boolean"
@@ -170,10 +170,12 @@
                                 "type": "string",
                                 "minLength": 1
                               },
-                              "weight": {
-                                "type": "number",
-                                "minimum": 1,
-                                "maximum": 10
+                              "domain": {
+                                "default": null,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 5,
+                                "nullable": true
                               },
                               "materialUrl": {
                                 "type": "string"
@@ -197,13 +199,22 @@
                                     },
                                     "mastered": {
                                       "type": "boolean"
+                                    },
+                                    "kind": {
+                                      "default": "regular",
+                                      "type": "string",
+                                      "enum": [
+                                        "regular",
+                                        "eve_review"
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "id",
                                     "name",
                                     "read",
-                                    "mastered"
+                                    "mastered",
+                                    "kind"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -212,7 +223,7 @@
                             "required": [
                               "id",
                               "name",
-                              "weight",
+                              "domain",
                               "topics"
                             ],
                             "additionalProperties": false
@@ -598,7 +609,7 @@
                               "hours": {
                                 "type": "number",
                                 "minimum": 1,
-                                "maximum": 70
+                                "maximum": 24
                               },
                               "configured": {
                                 "type": "boolean"
@@ -634,17 +645,11 @@
                             "type": "string",
                             "minLength": 1,
                             "maxLength": 120
-                          },
-                          "weight": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 10
                           }
                         },
                         "required": [
                           "type",
-                          "name",
-                          "weight"
+                          "name"
                         ],
                         "additionalProperties": false
                       },
@@ -676,6 +681,27 @@
                           "id",
                           "name",
                           "materialUrl"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "deleteSubject"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
                         ],
                         "additionalProperties": false
                       },
@@ -718,7 +744,34 @@
                           "type": {
                             "type": "string",
                             "enum": [
-                              "weight"
+                              "deleteTopic"
+                            ]
+                          },
+                          "subjectId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "subjectId",
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "domain"
                             ]
                           },
                           "id": {
@@ -726,16 +779,16 @@
                             "format": "uuid",
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
-                          "weight": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 10
+                          "domain": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
                           }
                         },
                         "required": [
                           "type",
                           "id",
-                          "weight"
+                          "domain"
                         ],
                         "additionalProperties": false
                       },
@@ -1151,7 +1204,7 @@
                             "hours": {
                               "type": "number",
                               "minimum": 1,
-                              "maximum": 70
+                              "maximum": 24
                             },
                             "configured": {
                               "type": "boolean"
@@ -1277,10 +1330,12 @@
                                 "type": "string",
                                 "minLength": 1
                               },
-                              "weight": {
-                                "type": "number",
-                                "minimum": 1,
-                                "maximum": 10
+                              "domain": {
+                                "default": null,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 5,
+                                "nullable": true
                               },
                               "materialUrl": {
                                 "type": "string"
@@ -1304,13 +1359,22 @@
                                     },
                                     "mastered": {
                                       "type": "boolean"
+                                    },
+                                    "kind": {
+                                      "default": "regular",
+                                      "type": "string",
+                                      "enum": [
+                                        "regular",
+                                        "eve_review"
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "id",
                                     "name",
                                     "read",
-                                    "mastered"
+                                    "mastered",
+                                    "kind"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -1319,7 +1383,7 @@
                             "required": [
                               "id",
                               "name",
-                              "weight",
+                              "domain",
                               "topics"
                             ],
                             "additionalProperties": false

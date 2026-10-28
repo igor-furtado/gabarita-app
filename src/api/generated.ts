@@ -33,7 +33,7 @@ export type GetState200DataProfile = {
   startDate: string;
   /**
    * @minimum 1
-   * @maximum 70
+   * @maximum 24
    */
   hours: number;
   configured: boolean;
@@ -89,6 +89,15 @@ export type GetState200DataContestsItem = {
   subjects: GetState200DataContestsItemSubjectsItem[];
 };
 
+export type GetState200DataSubjectsItemTopicsItemKind = typeof GetState200DataSubjectsItemTopicsItemKind[keyof typeof GetState200DataSubjectsItemTopicsItemKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetState200DataSubjectsItemTopicsItemKind = {
+  regular: 'regular',
+  eve_review: 'eve_review',
+} as const;
+
 export type GetState200DataSubjectsItemTopicsItem = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
@@ -96,6 +105,7 @@ export type GetState200DataSubjectsItemTopicsItem = {
   name: string;
   read: boolean;
   mastered: boolean;
+  kind: GetState200DataSubjectsItemTopicsItemKind;
 };
 
 export type GetState200DataSubjectsItem = {
@@ -104,10 +114,11 @@ export type GetState200DataSubjectsItem = {
   /** @minLength 1 */
   name: string;
   /**
-   * @minimum 1
-   * @maximum 10
+   * @minimum 0
+   * @maximum 5
+   * @nullable
    */
-  weight: number;
+  domain: number | null;
   materialUrl?: string;
   topics: GetState200DataSubjectsItemTopicsItem[];
 };
@@ -297,7 +308,7 @@ export type ExecuteCommandBodyCommandOneOfSixProfile = {
   startDate: string;
   /**
    * @minimum 1
-   * @maximum 70
+   * @maximum 24
    */
   hours: number;
   configured: boolean;
@@ -323,11 +334,6 @@ export type ExecuteCommandBodyCommandOneOfNine = {
    * @maxLength 120
    */
   name: string;
-  /**
-   * @minimum 1
-   * @maximum 10
-   */
-  weight: number;
 };
 
 export type ExecuteCommandBodyCommandOneOfOneoneType = typeof ExecuteCommandBodyCommandOneOfOneoneType[keyof typeof ExecuteCommandBodyCommandOneOfOneoneType];
@@ -355,20 +361,13 @@ export type ExecuteCommandBodyCommandOneOfOnethreeType = typeof ExecuteCommandBo
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ExecuteCommandBodyCommandOneOfOnethreeType = {
-  editTopic: 'editTopic',
+  deleteSubject: 'deleteSubject',
 } as const;
 
 export type ExecuteCommandBodyCommandOneOfOnethree = {
   type: ExecuteCommandBodyCommandOneOfOnethreeType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  subjectId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
-  /**
-   * @minLength 1
-   * @maxLength 200
-   */
-  name: string;
 };
 
 export type ExecuteCommandBodyCommandOneOfOnefiveType = typeof ExecuteCommandBodyCommandOneOfOnefiveType[keyof typeof ExecuteCommandBodyCommandOneOfOnefiveType];
@@ -376,18 +375,20 @@ export type ExecuteCommandBodyCommandOneOfOnefiveType = typeof ExecuteCommandBod
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ExecuteCommandBodyCommandOneOfOnefiveType = {
-  weight: 'weight',
+  editTopic: 'editTopic',
 } as const;
 
 export type ExecuteCommandBodyCommandOneOfOnefive = {
   type: ExecuteCommandBodyCommandOneOfOnefiveType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  subjectId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   /**
-   * @minimum 1
-   * @maximum 10
+   * @minLength 1
+   * @maxLength 200
    */
-  weight: number;
+  name: string;
 };
 
 export type ExecuteCommandBodyCommandOneOfOnesevenType = typeof ExecuteCommandBodyCommandOneOfOnesevenType[keyof typeof ExecuteCommandBodyCommandOneOfOnesevenType];
@@ -395,11 +396,46 @@ export type ExecuteCommandBodyCommandOneOfOnesevenType = typeof ExecuteCommandBo
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ExecuteCommandBodyCommandOneOfOnesevenType = {
-  topic: 'topic',
+  deleteTopic: 'deleteTopic',
 } as const;
 
 export type ExecuteCommandBodyCommandOneOfOneseven = {
   type: ExecuteCommandBodyCommandOneOfOnesevenType;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  subjectId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+};
+
+export type ExecuteCommandBodyCommandOneOfOnenineType = typeof ExecuteCommandBodyCommandOneOfOnenineType[keyof typeof ExecuteCommandBodyCommandOneOfOnenineType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ExecuteCommandBodyCommandOneOfOnenineType = {
+  domain: 'domain',
+} as const;
+
+export type ExecuteCommandBodyCommandOneOfOnenine = {
+  type: ExecuteCommandBodyCommandOneOfOnenineType;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+   * @minimum 0
+   * @maximum 5
+   */
+  domain: number;
+};
+
+export type ExecuteCommandBodyCommandOneOfTwooneType = typeof ExecuteCommandBodyCommandOneOfTwooneType[keyof typeof ExecuteCommandBodyCommandOneOfTwooneType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ExecuteCommandBodyCommandOneOfTwooneType = {
+  topic: 'topic',
+} as const;
+
+export type ExecuteCommandBodyCommandOneOfTwoone = {
+  type: ExecuteCommandBodyCommandOneOfTwooneType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   subjectId: string;
   /**
@@ -409,16 +445,16 @@ export type ExecuteCommandBodyCommandOneOfOneseven = {
   name: string;
 };
 
-export type ExecuteCommandBodyCommandOneOfOnenineType = typeof ExecuteCommandBodyCommandOneOfOnenineType[keyof typeof ExecuteCommandBodyCommandOneOfOnenineType];
+export type ExecuteCommandBodyCommandOneOfTwothreeType = typeof ExecuteCommandBodyCommandOneOfTwothreeType[keyof typeof ExecuteCommandBodyCommandOneOfTwothreeType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfOnenineType = {
+export const ExecuteCommandBodyCommandOneOfTwothreeType = {
   topics: 'topics',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfOnenine = {
-  type: ExecuteCommandBodyCommandOneOfOnenineType;
+export type ExecuteCommandBodyCommandOneOfTwothree = {
+  type: ExecuteCommandBodyCommandOneOfTwothreeType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   subjectId: string;
   /**
@@ -428,41 +464,41 @@ export type ExecuteCommandBodyCommandOneOfOnenine = {
   names: string[];
 };
 
-export type ExecuteCommandBodyCommandOneOfTwooneType = typeof ExecuteCommandBodyCommandOneOfTwooneType[keyof typeof ExecuteCommandBodyCommandOneOfTwooneType];
+export type ExecuteCommandBodyCommandOneOfTwofiveType = typeof ExecuteCommandBodyCommandOneOfTwofiveType[keyof typeof ExecuteCommandBodyCommandOneOfTwofiveType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfTwooneType = {
+export const ExecuteCommandBodyCommandOneOfTwofiveType = {
   reorderTopics: 'reorderTopics',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfTwoone = {
-  type: ExecuteCommandBodyCommandOneOfTwooneType;
+export type ExecuteCommandBodyCommandOneOfTwofive = {
+  type: ExecuteCommandBodyCommandOneOfTwofiveType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   subjectId: string;
   /** @minItems 1 */
   topicIds: string[];
 };
 
-export type ExecuteCommandBodyCommandOneOfTwothreeType = typeof ExecuteCommandBodyCommandOneOfTwothreeType[keyof typeof ExecuteCommandBodyCommandOneOfTwothreeType];
+export type ExecuteCommandBodyCommandOneOfTwosevenType = typeof ExecuteCommandBodyCommandOneOfTwosevenType[keyof typeof ExecuteCommandBodyCommandOneOfTwosevenType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfTwothreeType = {
+export const ExecuteCommandBodyCommandOneOfTwosevenType = {
   session: 'session',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfTwothreeSessionKind = typeof ExecuteCommandBodyCommandOneOfTwothreeSessionKind[keyof typeof ExecuteCommandBodyCommandOneOfTwothreeSessionKind];
+export type ExecuteCommandBodyCommandOneOfTwosevenSessionKind = typeof ExecuteCommandBodyCommandOneOfTwosevenSessionKind[keyof typeof ExecuteCommandBodyCommandOneOfTwosevenSessionKind];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfTwothreeSessionKind = {
+export const ExecuteCommandBodyCommandOneOfTwosevenSessionKind = {
   reading: 'reading',
   active: 'active',
   mock: 'mock',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfTwothreeSession = {
+export type ExecuteCommandBodyCommandOneOfTwosevenSession = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
@@ -486,24 +522,24 @@ export type ExecuteCommandBodyCommandOneOfTwothreeSession = {
    * @maximum 1000
    */
   correct: number;
-  kind: ExecuteCommandBodyCommandOneOfTwothreeSessionKind;
+  kind: ExecuteCommandBodyCommandOneOfTwosevenSessionKind;
 };
-
-export type ExecuteCommandBodyCommandOneOfTwothree = {
-  type: ExecuteCommandBodyCommandOneOfTwothreeType;
-  session: ExecuteCommandBodyCommandOneOfTwothreeSession;
-};
-
-export type ExecuteCommandBodyCommandOneOfTwosevenType = typeof ExecuteCommandBodyCommandOneOfTwosevenType[keyof typeof ExecuteCommandBodyCommandOneOfTwosevenType];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfTwosevenType = {
-  review: 'review',
-} as const;
 
 export type ExecuteCommandBodyCommandOneOfTwoseven = {
   type: ExecuteCommandBodyCommandOneOfTwosevenType;
+  session: ExecuteCommandBodyCommandOneOfTwosevenSession;
+};
+
+export type ExecuteCommandBodyCommandOneOfThreeoneType = typeof ExecuteCommandBodyCommandOneOfThreeoneType[keyof typeof ExecuteCommandBodyCommandOneOfThreeoneType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ExecuteCommandBodyCommandOneOfThreeoneType = {
+  review: 'review',
+} as const;
+
+export type ExecuteCommandBodyCommandOneOfThreeone = {
+  type: ExecuteCommandBodyCommandOneOfThreeoneType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   /**
@@ -518,15 +554,15 @@ export type ExecuteCommandBodyCommandOneOfTwoseven = {
   correct: number;
 };
 
-export type ExecuteCommandBodyCommandOneOfTwonineType = typeof ExecuteCommandBodyCommandOneOfTwonineType[keyof typeof ExecuteCommandBodyCommandOneOfTwonineType];
+export type ExecuteCommandBodyCommandOneOfThreethreeType = typeof ExecuteCommandBodyCommandOneOfThreethreeType[keyof typeof ExecuteCommandBodyCommandOneOfThreethreeType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfTwonineType = {
+export const ExecuteCommandBodyCommandOneOfThreethreeType = {
   error: 'error',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfTwonineError = {
+export type ExecuteCommandBodyCommandOneOfThreethreeError = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
@@ -541,51 +577,51 @@ export type ExecuteCommandBodyCommandOneOfTwonineError = {
   date: string;
 };
 
-export type ExecuteCommandBodyCommandOneOfTwonine = {
-  type: ExecuteCommandBodyCommandOneOfTwonineType;
-  error: ExecuteCommandBodyCommandOneOfTwonineError;
+export type ExecuteCommandBodyCommandOneOfThreethree = {
+  type: ExecuteCommandBodyCommandOneOfThreethreeType;
+  error: ExecuteCommandBodyCommandOneOfThreethreeError;
 };
 
-export type ExecuteCommandBodyCommandOneOfThreetwoType = typeof ExecuteCommandBodyCommandOneOfThreetwoType[keyof typeof ExecuteCommandBodyCommandOneOfThreetwoType];
+export type ExecuteCommandBodyCommandOneOfThreesixType = typeof ExecuteCommandBodyCommandOneOfThreesixType[keyof typeof ExecuteCommandBodyCommandOneOfThreesixType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfThreetwoType = {
+export const ExecuteCommandBodyCommandOneOfThreesixType = {
   resolve: 'resolve',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfThreetwo = {
-  type: ExecuteCommandBodyCommandOneOfThreetwoType;
+export type ExecuteCommandBodyCommandOneOfThreesix = {
+  type: ExecuteCommandBodyCommandOneOfThreesixType;
   id: string;
 };
 
-export type ExecuteCommandBodyCommandOneOfThreefourType = typeof ExecuteCommandBodyCommandOneOfThreefourType[keyof typeof ExecuteCommandBodyCommandOneOfThreefourType];
+export type ExecuteCommandBodyCommandOneOfThreeeightType = typeof ExecuteCommandBodyCommandOneOfThreeeightType[keyof typeof ExecuteCommandBodyCommandOneOfThreeeightType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfThreefourType = {
+export const ExecuteCommandBodyCommandOneOfThreeeightType = {
   reminder: 'reminder',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfThreefourReminderKind = typeof ExecuteCommandBodyCommandOneOfThreefourReminderKind[keyof typeof ExecuteCommandBodyCommandOneOfThreefourReminderKind];
+export type ExecuteCommandBodyCommandOneOfThreeeightReminderKind = typeof ExecuteCommandBodyCommandOneOfThreeeightReminderKind[keyof typeof ExecuteCommandBodyCommandOneOfThreeeightReminderKind];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfThreefourReminderKind = {
+export const ExecuteCommandBodyCommandOneOfThreeeightReminderKind = {
   memorize: 'memorize',
   attention: 'attention',
   jurisprudence: 'jurisprudence',
   observation: 'observation',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfThreefourReminder = {
+export type ExecuteCommandBodyCommandOneOfThreeeightReminder = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   subjectId: string;
   /** @minLength 1 */
   text: string;
-  kind: ExecuteCommandBodyCommandOneOfThreefourReminderKind;
+  kind: ExecuteCommandBodyCommandOneOfThreeeightReminderKind;
   /**
    * @minimum 0
    * @maximum 9007199254740991
@@ -594,27 +630,27 @@ export type ExecuteCommandBodyCommandOneOfThreefourReminder = {
   marked: boolean;
 };
 
-export type ExecuteCommandBodyCommandOneOfThreefour = {
-  type: ExecuteCommandBodyCommandOneOfThreefourType;
-  reminder: ExecuteCommandBodyCommandOneOfThreefourReminder;
+export type ExecuteCommandBodyCommandOneOfThreeeight = {
+  type: ExecuteCommandBodyCommandOneOfThreeeightType;
+  reminder: ExecuteCommandBodyCommandOneOfThreeeightReminder;
 };
 
-export type ExecuteCommandBodyCommandOneOfThreeeightType = typeof ExecuteCommandBodyCommandOneOfThreeeightType[keyof typeof ExecuteCommandBodyCommandOneOfThreeeightType];
+export type ExecuteCommandBodyCommandOneOfFourtwoType = typeof ExecuteCommandBodyCommandOneOfFourtwoType[keyof typeof ExecuteCommandBodyCommandOneOfFourtwoType];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ExecuteCommandBodyCommandOneOfThreeeightType = {
+export const ExecuteCommandBodyCommandOneOfFourtwoType = {
   remember: 'remember',
 } as const;
 
-export type ExecuteCommandBodyCommandOneOfThreeeight = {
-  type: ExecuteCommandBodyCommandOneOfThreeeightType;
+export type ExecuteCommandBodyCommandOneOfFourtwo = {
+  type: ExecuteCommandBodyCommandOneOfFourtwoType;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
   known: boolean;
 };
 
-export type ExecuteCommandBodyCommand = ExecuteCommandBodyCommandOneOf | ExecuteCommandBodyCommandOneOfSix | ExecuteCommandBodyCommandOneOfNine | ExecuteCommandBodyCommandOneOfOneone | ExecuteCommandBodyCommandOneOfOnethree | ExecuteCommandBodyCommandOneOfOnefive | ExecuteCommandBodyCommandOneOfOneseven | ExecuteCommandBodyCommandOneOfOnenine | ExecuteCommandBodyCommandOneOfTwoone | ExecuteCommandBodyCommandOneOfTwothree | ExecuteCommandBodyCommandOneOfTwoseven | ExecuteCommandBodyCommandOneOfTwonine | ExecuteCommandBodyCommandOneOfThreetwo | ExecuteCommandBodyCommandOneOfThreefour | ExecuteCommandBodyCommandOneOfThreeeight;
+export type ExecuteCommandBodyCommand = ExecuteCommandBodyCommandOneOf | ExecuteCommandBodyCommandOneOfSix | ExecuteCommandBodyCommandOneOfNine | ExecuteCommandBodyCommandOneOfOneone | ExecuteCommandBodyCommandOneOfOnethree | ExecuteCommandBodyCommandOneOfOnefive | ExecuteCommandBodyCommandOneOfOneseven | ExecuteCommandBodyCommandOneOfOnenine | ExecuteCommandBodyCommandOneOfTwoone | ExecuteCommandBodyCommandOneOfTwothree | ExecuteCommandBodyCommandOneOfTwofive | ExecuteCommandBodyCommandOneOfTwoseven | ExecuteCommandBodyCommandOneOfThreeone | ExecuteCommandBodyCommandOneOfThreethree | ExecuteCommandBodyCommandOneOfThreesix | ExecuteCommandBodyCommandOneOfThreeeight | ExecuteCommandBodyCommandOneOfFourtwo;
 
 export type ExecuteCommandBody = {
   /**
@@ -633,7 +669,7 @@ export type ExecuteCommand200DataProfile = {
   startDate: string;
   /**
    * @minimum 1
-   * @maximum 70
+   * @maximum 24
    */
   hours: number;
   configured: boolean;
@@ -689,6 +725,15 @@ export type ExecuteCommand200DataContestsItem = {
   subjects: ExecuteCommand200DataContestsItemSubjectsItem[];
 };
 
+export type ExecuteCommand200DataSubjectsItemTopicsItemKind = typeof ExecuteCommand200DataSubjectsItemTopicsItemKind[keyof typeof ExecuteCommand200DataSubjectsItemTopicsItemKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ExecuteCommand200DataSubjectsItemTopicsItemKind = {
+  regular: 'regular',
+  eve_review: 'eve_review',
+} as const;
+
 export type ExecuteCommand200DataSubjectsItemTopicsItem = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
@@ -696,6 +741,7 @@ export type ExecuteCommand200DataSubjectsItemTopicsItem = {
   name: string;
   read: boolean;
   mastered: boolean;
+  kind: ExecuteCommand200DataSubjectsItemTopicsItemKind;
 };
 
 export type ExecuteCommand200DataSubjectsItem = {
@@ -704,10 +750,11 @@ export type ExecuteCommand200DataSubjectsItem = {
   /** @minLength 1 */
   name: string;
   /**
-   * @minimum 1
-   * @maximum 10
+   * @minimum 0
+   * @maximum 5
+   * @nullable
    */
-  weight: number;
+  domain: number | null;
   materialUrl?: string;
   topics: ExecuteCommand200DataSubjectsItemTopicsItem[];
 };
