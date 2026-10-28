@@ -4,7 +4,7 @@ import {
   recommendation,
   phase,
   type Contest,
-} from "../server/domain";
+} from "../server/domain.js";
 import {
   contestProgress,
   examGroups,
@@ -14,7 +14,7 @@ import {
   rankedSubjects,
   scenario,
   studyWeek,
-} from "../server/planning";
+} from "../server/planning.js";
 const date = "2026-10-26";
 function setup() {
   const s = initialState();

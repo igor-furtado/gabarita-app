@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { it, expect } from "vitest";
-import { sandboxDatabase } from "./database";
-import { migrateDatabase } from "../server/migrate";
-import { readWorkspace, executeRelationalCommand } from "../server/repository";
-import { initialState, today } from "../server/domain";
+import { sandboxDatabase } from "./database.js";
+import { migrateDatabase } from "../server/migrate.js";
+import { readWorkspace, executeRelationalCommand } from "../server/repository.js";
+import { initialState, today } from "../server/domain.js";
 function legacy() {
   const s = initialState();
   s.profile = {

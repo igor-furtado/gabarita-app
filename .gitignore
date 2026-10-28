@@ -1,13 +1,23 @@
-node_modules
+# Dependências
+**/node_modules/
+
+# Variáveis de ambiente
 .env
-dist
-dist-server
-playwright-report
-test-results
+**/ .env
+
+# Builds e saídas de compilação
+**/dist/
+**/dist-server/
+**/output/
+**/tmp/
+
+# Relatórios de testes
+**/playwright-report/
+**/test-results/
+
+# Logs e arquivos temporários
 *.log
-output/qa
+**/ *.log
 
-backups/
-
-output/
-tmp/
+# Backups
+**/backups/

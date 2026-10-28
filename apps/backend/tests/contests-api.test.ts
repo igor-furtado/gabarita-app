@@ -1,13 +1,13 @@
 // @vitest-environment node
 import { it, expect } from "vitest";
-import { sandboxDatabase } from "./database";
-import { migrateDatabase } from "../server/migrate";
+import { sandboxDatabase } from "./database.js";
+import { migrateDatabase } from "../server/migrate.js";
 import {
   initializeWorkspace,
   readWorkspace,
   executeRelationalCommand,
-} from "../server/repository";
-import { today, type Contest, type Command } from "../server/domain";
+} from "../server/repository.js";
+import { today, type Contest, type Command } from "../server/domain.js";
 it("edital relacional preserva histórico, valida vínculos e isola espaços", async () => {
   const box = await sandboxDatabase();
   try {

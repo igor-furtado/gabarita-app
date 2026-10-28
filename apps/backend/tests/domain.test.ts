@@ -6,7 +6,7 @@ import {
   addDays,
   today,
   phase,
-} from "../server/domain";
+} from "../server/domain.js";
 function fixture() {
   const s = initialState();
   s.subjects[0]!.topics = [
@@ -53,7 +53,7 @@ describe("Validações do método", () => {
   });
 });
 
-import { recommendation } from "../server/domain";
+import { recommendation } from "../server/domain.js";
 it("domingo é descanso mesmo com revisão pendente", () => {
   const s = fixture();
   s.reviews = [

@@ -421,7 +421,7 @@ async function archive(contest: Contest) {
       </div>
       <div class="contest-actions">
         <Button variant="outline" :disabled="pending" @click="edit(contest)"
-          >Editar edital</Button
+          >Editar</Button
         ><Button variant="ghost" :disabled="pending" @click="archive(contest)"
           ><Archive :size="15" />{{
             contest.archived ? "Reativar" : "Arquivar"

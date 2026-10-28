@@ -1,19 +1,19 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, it, expect } from "vitest";
-import { buildApp } from "../server/app";
-import { migrateDatabase } from "../server/migrate";
-import { sandboxDatabase } from "./database";
+import { buildApp } from "../server/app.js";
+import { migrateDatabase } from "../server/migrate.js";
+import { sandboxDatabase } from "./database.js";
 import {
   initialState,
   today,
   addDays,
   type Command,
   type State,
-} from "../server/domain";
+} from "../server/domain.js";
 import {
   initializeWorkspace,
   executeRelationalCommand,
-} from "../server/repository";
+} from "../server/repository.js";
 import { sql } from "drizzle-orm";
 let sandbox: Awaited<ReturnType<typeof sandboxDatabase>>;
 let app: Awaited<ReturnType<typeof buildApp>>;

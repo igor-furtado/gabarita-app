@@ -1,8 +1,8 @@
-node_modules
-dist
-dist-server
+**/node_modules
+**/dist
+**/dist-server
 pnpm-lock.yaml
-src/api
-openapi.json
-playwright-report
-test-results
+**/src/api
+**/openapi.json
+**/playwright-report
+**/test-results
