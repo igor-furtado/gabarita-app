@@ -1,4 +1,4 @@
-import type { Contest, State } from "./domain.js";
+import type { Contest, State } from "./schemas.js";
 
 export function activeContests(s: State, date: string) {
   return (s.contests ?? [])

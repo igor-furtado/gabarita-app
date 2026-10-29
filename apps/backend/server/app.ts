@@ -2,7 +2,8 @@ import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { z } from "zod";
-import { stateSchema, commandSchema, DomainError } from "./domain.js";
+import { DomainError } from "@gabarita/shared";
+import { stateSchema, commandSchema } from "@gabarita/shared/schemas";
 import {
   initializeWorkspace,
   readWorkspace,

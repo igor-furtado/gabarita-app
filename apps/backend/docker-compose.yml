@@ -1,3 +1,5 @@
+name: gabarita_app
+
 services:
   db:
     image: postgres:17-alpine
@@ -12,7 +14,9 @@ services:
       interval: 3s
       retries: 20
   app:
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
     profiles: ["full"]
     environment:
       DATABASE_URL: postgres://gabarita:${POSTGRES_PASSWORD:-gabarita_local}@db:5432/gabarita

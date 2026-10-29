@@ -49,21 +49,18 @@ import {
 import ContestsPage from "./features/contests/ContestsPage.vue";
 import {
   activeContests,
+  addDays,
   planOutline,
   planReadiness,
   rankedSubjects,
+  recommendation,
   studyWeek,
-} from "../server/planning";
+  today,
+  type Command,
+  type State,
+} from "@gabarita/shared";
 import Button from "./components/ui/button/Button.vue";
 import { useGetState, executeCommand } from "./api/generated";
-import {
-  today,
-  addDays,
-  recommendation,
-  type State,
-  type commandSchema,
-} from "../server/domain";
-import type { z } from "zod";
 const route = useRoute(),
   router = useRouter(),
   queryClient = useQueryClient();
@@ -302,7 +299,7 @@ const time = computed(
       )}:${(timer.value.seconds % 60).toString().padStart(2, "0")}`,
 );
 let sendQueue: Promise<unknown> = Promise.resolve();
-function send(command: z.infer<typeof commandSchema>) {
+function send(command: Command) {
   const execute = async () => {
     if (!query.data.value) return false;
     pending.value = true;
@@ -360,7 +357,7 @@ function open(type: string, id?: string) {
   modal.value = type;
 }
 async function save() {
-  let command: z.infer<typeof commandSchema>;
+  let command: Command;
   if (modal.value === "editSubject")
     command = {
       type: "editSubject",

@@ -3,7 +3,7 @@ import { it, expect } from "vitest";
 import { sandboxDatabase } from "./database.js";
 import { migrateDatabase } from "../server/migrate.js";
 import { readWorkspace, executeRelationalCommand } from "../server/repository.js";
-import { initialState, today } from "../server/domain.js";
+import { initialState, today } from "@gabarita/shared";
 function legacy() {
   const s = initialState();
   s.profile = {

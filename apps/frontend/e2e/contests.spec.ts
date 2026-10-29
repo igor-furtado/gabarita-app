@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import "dotenv/config";
 import postgres from "postgres";
-import { addDays, today, type State, type Command } from "../../backend/server/domain";
+import { addDays, today, type State, type Command } from "@gabarita/shared";
 const prefix = `Edital E2E ${Date.now()}`;
 test.afterAll(async () => {
   const sql = postgres(process.env.DATABASE_URL!);

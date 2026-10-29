@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 const sql = postgres(process.env.DATABASE_URL!);
 const app = await buildApp(drizzle(sql));
 if (process.env.NODE_ENV === "production") {
-  await app.register(fastifyStatic, { root: resolve("dist") });
+  await app.register(fastifyStatic, { root: resolve("../frontend/dist") });
   app.setNotFoundHandler((req, reply) =>
     req.url.startsWith("/api")
       ? reply.code(404).send({ message: "Não encontrado" })

@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.18.3",
   "scripts": {
-    "dev:frontend": "pnpm --filter @gabarita/frontend dev",
-    "dev:backend": "pnpm --filter @gabarita/backend dev",
-    "build:frontend": "pnpm --filter @gabarita/frontend build",
-    "build:backend": "pnpm --filter @gabarita/backend build"
+    "dev": "pnpm --filter @gabarita/shared build && pnpm --parallel --filter @gabarita/shared --filter @gabarita/frontend --filter @gabarita/backend dev",
+    "dev:frontend": "pnpm --filter @gabarita/shared build && pnpm --filter @gabarita/frontend dev",
+    "dev:backend": "pnpm --filter @gabarita/shared build && pnpm --filter @gabarita/backend dev",
+    "build:frontend": "pnpm --filter @gabarita/frontend... build",
+    "build:backend": "pnpm --filter @gabarita/backend... build",
+    "build": "pnpm -r --sort build",
+    "test": "pnpm -r --if-present test"
   }
 }

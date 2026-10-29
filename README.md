@@ -66,13 +66,13 @@ O contrato OpenAPI é gerado a partir dos schemas da API; `src/api/generated.ts`
 
 ## Estrutura
 
-- `src/App.vue`: interface e fluxos de estudo.
-- `src/components/ui`: componentes de interface acessíveis.
-- `server/domain.ts`: modelos, regras da metodologia e recomendação de próximo estudo.
-- `server/app.ts`: API e concorrência otimista.
-- `server/schema.ts`: tabelas relacionais, chaves estrangeiras, restrições e índices com Drizzle.
-- `server/repository.ts`: consultas e gravações relacionais em transações.
-- `server/migrate.ts` e `migrations/`: migração versionada com preservação dos dados legados.
+- `apps/frontend/src/App.vue`: interface e fluxos de estudo.
+- `apps/frontend/src/components/ui`: componentes de interface acessíveis.
+- `apps/backend/server/app.ts`: API e concorrência otimista.
+- `apps/backend/server/schema.ts`: tabelas relacionais, chaves estrangeiras, restrições e índices com Drizzle.
+- `apps/backend/server/repository.ts`: consultas e gravações relacionais em transações.
+- `apps/backend/server/migrate.ts` e `apps/backend/migrations/`: migração versionada com preservação dos dados legados.
+- `packages/shared/src`: modelos, contratos e regras puras da metodologia consumidos por frontend e backend através de `@gabarita/shared`.
 - `docs/banco-relacional.md`: diagrama, decisões e instruções de migração.
 - `docs/consultas.sql`: consultas para usar diretamente no DBeaver.
 - `docs/metodologia.md`: decisões de interpretação do guia.

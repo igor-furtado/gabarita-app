@@ -11,12 +11,13 @@ import {
 } from "lucide-vue-next";
 import Button from "../../components/ui/button/Button.vue";
 import {
+  activeContests,
+  contestProgress,
   today,
   type State,
   type Contest,
   type Command,
-} from "../../../server/domain";
-import { activeContests, contestProgress } from "../../../server/planning";
+} from "@gabarita/shared";
 const props = defineProps<{
   state: State;
   pending: boolean;

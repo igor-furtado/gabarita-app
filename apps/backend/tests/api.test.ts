@@ -9,7 +9,7 @@ import {
   addDays,
   type Command,
   type State,
-} from "../server/domain.js";
+} from "@gabarita/shared";
 import {
   initializeWorkspace,
   executeRelationalCommand,

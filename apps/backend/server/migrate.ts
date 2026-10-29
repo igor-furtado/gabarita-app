@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { stateSchema, profileSchema } from "./domain.js";
+import { stateSchema, profileSchema } from "@gabarita/shared/schemas";
 import { importLegacyWorkspace, type Database } from "./repository.js";
 
 const migrationId = "0001_relational";
